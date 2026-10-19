@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import {
   GameStatePublic,
   PlayerPrivate,
-  Role,
 } from '../types/game.ts';
 import { ROLE_INFO, CHARACTERS } from '../data/characters.ts';
 import {
@@ -18,7 +17,10 @@ import {
   Flame,
   ChevronDown,
   ChevronUp,
+  Users,
 } from 'lucide-react';
+import { CharacterAvatar } from './CharacterAvatar.tsx';
+import { OrnateCorner } from './OrnateFrame.tsx';
 
 interface DiscussionPhaseProps {
   gameState: GameStatePublic;
@@ -93,7 +95,7 @@ export function DiscussionPhase({
   const getPhaseTitle = () => {
     switch (phase) {
       case 'first_discussion':
-        return '第一討論：一族の宴と祖父の回想';
+        return '第一討論：一族の集い';
       case 'word_wolf':
         return 'ワードウルフ：合言葉の化かし合い';
       case 'final_discussion':
@@ -104,36 +106,50 @@ export function DiscussionPhase({
   };
 
   return (
-    <div className="max-w-2xl mx-auto my-3 sm:my-6 px-4 space-y-4 sm:space-y-6 animate-fade-in pb-20">
+    <div className="max-w-2xl mx-auto my-1.5 sm:my-3 px-2.5 sm:px-4 space-y-2 sm:space-y-3 animate-fade-in pb-12">
       {/* Top Banner & Synchronized Timer */}
-      <div className="bg-stone-900/90 border border-amber-900/40 rounded-2xl p-4 sm:p-5 shadow-2xl backdrop-blur-md">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-stone-800">
+      <div className="relative dark-panel p-3 sm:p-5 shadow-2xl overflow-hidden border-amber-600/60">
+        <div className="absolute inset-[3px] rounded-xl border border-amber-500/20 pointer-events-none" />
+        <div className="absolute top-1 left-1 pointer-events-none">
+          <OrnateCorner position="top-left" className="w-5 h-5 text-amber-500/70" />
+        </div>
+        <div className="absolute top-1 right-1 pointer-events-none">
+          <OrnateCorner position="top-right" className="w-5 h-5 text-amber-500/70" />
+        </div>
+        <div className="absolute bottom-1 left-1 pointer-events-none">
+          <OrnateCorner position="bottom-left" className="w-5 h-5 text-amber-500/70" />
+        </div>
+        <div className="absolute bottom-1 right-1 pointer-events-none">
+          <OrnateCorner position="bottom-right" className="w-5 h-5 text-amber-500/70" />
+        </div>
+
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-stone-800/80">
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 bg-amber-950 border border-amber-800 text-amber-300 font-serif text-[11px] font-bold rounded">
+              <span className="px-2.5 py-0.5 bg-stone-950 border border-amber-500/70 text-amber-300 font-serif text-[11px] font-bold rounded">
                 PHASE
               </span>
               {isExtensionActive && (
-                <span className="px-2.5 py-0.5 bg-red-950/90 border border-red-600 text-red-400 text-[11px] font-bold rounded-full animate-pulse flex items-center gap-1 shadow-sm">
+                <span className="px-2.5 py-0.5 bg-red-950 border border-red-600 text-red-400 text-[11px] font-bold rounded-full animate-pulse flex items-center gap-1 shadow-sm">
                   <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
                   <span>延長中（2:00カウントダウン）</span>
                 </span>
               )}
             </div>
-            <h2 className="text-base sm:text-lg font-serif font-bold text-stone-100 mt-1">
+            <h2 className="text-base sm:text-lg font-serif font-black tracking-wide text-amber-100 mt-1">
               {getPhaseTitle()}
             </h2>
           </div>
 
-          {/* Large Countdown (赤文字でカウントダウン) */}
+          {/* Large Countdown (0秒到達後、赤文字で2:00カウントダウン) */}
           <div className="flex items-center gap-2 self-start sm:self-auto">
             <div
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl border font-mono font-black text-xl sm:text-2xl tracking-widest shadow-inner ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl border font-mono font-black text-xl sm:text-2xl tracking-widest shadow-inner min-h-[48px] ${
                 isExtensionActive
                   ? 'bg-red-950/90 border-2 border-red-500 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)] animate-pulse'
                   : secondsLeft <= 30
                   ? 'bg-amber-950/60 border-amber-600 text-amber-300 animate-pulse'
-                  : 'bg-stone-950/80 border-stone-800 text-stone-100'
+                  : 'bg-stone-950 border-stone-800 text-stone-100'
               }`}
             >
               <Clock
@@ -148,8 +164,35 @@ export function DiscussionPhase({
           </div>
         </div>
 
+        {/* 4-4: 参加者のキャラクターアイコン一覧表示 */}
+        <div className="pt-3 pb-2 flex items-center justify-around sm:justify-center gap-2 sm:gap-4 overflow-x-auto">
+          {gameState.players.map((p) => {
+            const char = CHARACTERS.find((c) => c.id === p.characterId);
+            const isMe = p.id === currentUserId;
+            if (!char) return null;
+
+            return (
+              <div
+                key={p.id}
+                className={`flex flex-col items-center p-1 rounded-xl transition ${
+                  isMe ? 'ring-1 ring-amber-500/80 bg-amber-950/20' : ''
+                }`}
+              >
+                <CharacterAvatar
+                  variant={char.id}
+                  size="xs"
+                  showNameplate={true}
+                  nameplateText={char.relation}
+                  isReady={p.isReadyNext}
+                  isConnected={p.isConnected}
+                />
+              </div>
+            );
+          })}
+        </div>
+
         {/* Ready to Advance Toggle */}
-        <div className="mt-3.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-1">
+        <div className="mt-3 flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-2 border-t border-stone-800/80">
           <div className="text-xs text-stone-400 flex items-center gap-1.5">
             <span className="font-medium">全員が終了を押すと即時次に進みます：</span>
             <span className="font-mono text-amber-300 font-bold">
@@ -159,10 +202,10 @@ export function DiscussionPhase({
 
           <button
             onClick={onToggleReady}
-            className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-serif font-bold tracking-wider flex items-center justify-center gap-1.5 transition shadow-lg ${
+            className={`w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-serif font-bold tracking-wider flex items-center justify-center gap-1.5 transition shadow-lg min-h-[44px] cursor-pointer ${
               myPlayer?.isReadyNext
-                ? 'bg-emerald-900/80 border border-emerald-600 text-emerald-200'
-                : 'bg-stone-800 hover:bg-stone-700 border border-stone-700 text-stone-200 active:scale-95'
+                ? 'bg-emerald-950 border border-emerald-500 text-emerald-200'
+                : 'bg-stone-900 hover:bg-stone-800 border border-stone-700 text-stone-200 active:scale-95'
             }`}
           >
             <CheckCircle2
@@ -179,24 +222,9 @@ export function DiscussionPhase({
         </div>
       </div>
 
-      {/* Phase Specific Guidance Banner */}
-      {isFirstDiscussion && (
-        <div className="p-4 bg-gradient-to-r from-amber-950/40 via-stone-950/80 to-amber-950/40 border border-amber-900/50 rounded-xl space-y-2">
-          <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
-            <MessageSquareQuote className="w-4 h-4 text-amber-400" />
-            <span>祖父の助言：</span>
-          </div>
-          <p className="text-sm font-serif text-amber-100/90 italic leading-relaxed">
-            「ワシについて話し合えば、なりすましがわかるやも知れん！」
-          </p>
-          <p className="text-xs text-stone-400 leading-relaxed">
-            このフェーズではワードはまだ明かされません。各人の担当場所や屋敷での様子、祖父との思い出について自由に話し合ってみましょう。
-          </p>
-        </div>
-      )}
-
+      {/* 最終討論：怪盗と妖狐の推理 */}
       {isFinalDiscussion && (
-        <div className="p-4 bg-purple-950/30 border border-purple-900/50 rounded-xl space-y-1.5 text-xs text-stone-300">
+        <div className="dark-panel p-4 sm:p-5 border-purple-900/60 space-y-1.5 text-xs text-stone-300">
           <div className="font-serif font-bold text-purple-300 text-sm flex items-center gap-1.5">
             <span>🎭</span>
             <span>怪盗と妖狐の特定へ向けた最終推理</span>
@@ -207,17 +235,41 @@ export function DiscussionPhase({
         </div>
       )}
 
-      {/* Secret Word & Role Card Area (Word Wolf & Final Discussion) */}
+      {/* ワードウルフフェーズのみ：当主の言葉を表示 */}
+      {isWordWolf && (
+        <div className="dark-panel p-4 sm:p-5 flex items-start gap-3.5 border-amber-600/60 shadow-lg animate-fade-in">
+          <CharacterAvatar
+            variant="head"
+            size="sm"
+            showNameplate={true}
+            nameplateText="当主"
+          />
+          <div className="space-y-1 flex-1">
+            <div className="text-xs font-serif font-bold text-amber-300 flex items-center gap-1.5">
+              <MessageSquareQuote className="w-4 h-4 text-amber-400" />
+              <span>当主の言葉：</span>
+            </div>
+            <p className="text-sm font-serif text-amber-100 italic leading-relaxed">
+              「ワシについて話し合えば、なりすましがわかるやも知れん！」
+            </p>
+            <p className="text-xs text-stone-400 leading-relaxed pt-1">
+              会話の中でワードを探り合い、怪しい発言や不自然な言動を見極めましょう。
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* 4-5: ワードウルフ画面 (ワードウルフ & 最終討論) */}
       {(isWordWolf || isFinalDiscussion) && (
-        <div className="bg-stone-900/90 border border-amber-900/50 rounded-2xl p-5 shadow-2xl space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+        <div className="dark-panel p-5 sm:p-6 space-y-4">
+          <div className="flex items-center justify-between pb-2 border-b border-stone-800">
+            <span className="text-xs font-serif font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
               <Sparkles className="w-4 h-4 text-amber-400" />
               あなたの秘密のワード
             </span>
             <button
               onClick={() => setIsWordRevealed((prev) => !prev)}
-              className="flex items-center gap-1 px-2.5 py-1 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg text-xs transition"
+              className="flex items-center gap-1 px-3 py-1.5 bg-stone-900 hover:bg-stone-800 border border-stone-700 text-stone-300 rounded-lg text-xs transition cursor-pointer min-h-[36px]"
             >
               {isWordRevealed ? (
                 <>
@@ -233,17 +285,17 @@ export function DiscussionPhase({
             </button>
           </div>
 
-          {/* Word display box */}
+          {/* Word display card (画面中央付近に大きく表示・のぞき見防止) */}
           <div
             onClick={() => setIsWordRevealed((prev) => !prev)}
-            className="cursor-pointer p-6 rounded-xl border border-dashed border-amber-700/60 bg-stone-950 text-center transition-all hover:bg-stone-950/80 shadow-inner"
+            className="cursor-pointer p-6 rounded-2xl border-2 border-dashed border-amber-600/60 bg-stone-950 text-center transition-all hover:bg-stone-950/80 shadow-inner min-h-[110px] flex items-center justify-center"
           >
             {isWordRevealed ? (
               <div className="space-y-1 animate-fade-in">
-                <span className="text-xs text-amber-400/90 font-medium">
+                <span className="text-xs text-amber-400/90 font-serif font-medium">
                   配布されたワード：
                 </span>
-                <div className="text-2xl sm:text-3xl font-serif font-black text-amber-200 tracking-wider">
+                <div className="text-2xl sm:text-3xl font-serif font-black text-amber-100 tracking-wider">
                   {privateState.word || '配布中...'}
                 </div>
                 <p className="text-[11px] text-stone-500 pt-1">
@@ -251,16 +303,16 @@ export function DiscussionPhase({
                 </p>
               </div>
             ) : (
-              <div className="py-2 text-stone-500 text-xs flex flex-col items-center gap-1.5">
-                <Eye className="w-5 h-5 text-amber-500/70" />
+              <div className="py-2 text-stone-400 text-xs flex flex-col items-center gap-1.5 font-serif">
+                <Eye className="w-6 h-6 text-amber-400/80 animate-pulse" />
                 <span>のぞき見防止中：ここをタップしてワードを確認</span>
               </div>
             )}
           </div>
 
-          {/* Kitsune Secret Mission (Only for Kitsune) */}
+          {/* 妖狐の指定ワード & 自己申告ボタン */}
           {isKitsune && (
-            <div className="mt-4 p-4 rounded-xl border-2 border-amber-600/70 bg-gradient-to-br from-amber-950/60 to-stone-950 shadow-xl space-y-3">
+            <div className="p-4 rounded-xl border-2 border-amber-500/70 bg-gradient-to-br from-amber-950/60 via-stone-950 to-stone-950 shadow-xl space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <Flame className="w-4 h-4 text-amber-400" />
@@ -273,8 +325,8 @@ export function DiscussionPhase({
                 </span>
               </div>
 
-              <div className="p-3 bg-stone-950/90 rounded-lg border border-amber-900/60 text-center">
-                <span className="text-xs text-stone-400 block mb-0.5">
+              <div className="p-3 bg-stone-950 rounded-lg border border-amber-700/60 text-center">
+                <span className="text-xs text-stone-400 block mb-0.5 font-serif">
                   会話中に自然に発言すべき指定ワード：
                 </span>
                 <span className="text-xl font-serif font-black text-amber-300 tracking-wider">
@@ -282,23 +334,23 @@ export function DiscussionPhase({
                 </span>
               </div>
 
-              <p className="text-xs text-stone-300 leading-relaxed">
+              <p className="text-xs text-stone-300 leading-relaxed font-serif">
                 怪しまれずに会話の中にこの言葉を入れられたら、下のボタンを押してください（結果発表時に公開されます）。
               </p>
 
               {/* Toggle Declaration Button */}
               <button
                 onClick={onKitsuneDeclare}
-                className={`w-full py-2.5 rounded-xl text-xs font-serif font-bold tracking-wider flex items-center justify-center gap-2 transition ${
+                className={`w-full py-3.5 rounded-xl text-xs font-serif font-bold tracking-wider flex items-center justify-center gap-2 transition min-h-[48px] cursor-pointer ${
                   privateState.kitsuneDeclared
                     ? 'bg-amber-600 text-stone-950 shadow-[0_0_15px_rgba(251,191,36,0.4)]'
-                    : 'bg-stone-800 hover:bg-stone-700 text-amber-300 border border-amber-800/60'
+                    : 'bg-stone-900 hover:bg-stone-800 text-amber-300 border border-amber-700/80'
                 }`}
               >
                 <CheckCircle2 className="w-4 h-4" />
                 <span>
                   {privateState.kitsuneDeclared
-                    ? '★ 指定ワードを言えた！（申告済み・解除可能）'
+                    ? '★ 指定ワードを言えた！（申告済み・タップで解除可能）'
                     : '指定ワードを言えたらタップ（自己申告）'}
                 </span>
               </button>
@@ -308,39 +360,43 @@ export function DiscussionPhase({
       )}
 
       {/* My Character & Role Summary */}
-      <div className="p-4 bg-stone-950/70 border border-stone-800 rounded-xl flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-900/50 border border-amber-600/40 flex items-center justify-center font-serif font-black text-amber-200 text-sm">
-            {myChar?.relation.slice(0, 2) || '一族'}
-          </div>
-          <div>
-            <div className="text-xs sm:text-sm font-serif font-bold text-stone-200">
-              {myChar?.relation}（📍{myChar?.location}）
+      {myChar && (
+        <div className="dark-panel p-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <CharacterAvatar
+              variant={myChar.id}
+              size="sm"
+              showNameplate={false}
+            />
+            <div className="truncate">
+              <div className="text-xs sm:text-sm font-serif font-bold text-stone-200">
+                {myChar.relation}
+              </div>
+              <div className="text-xs text-amber-400 font-serif font-medium">
+                あなたの役職：【{myRole ? ROLE_INFO[myRole]?.name : '確認中'}】
+              </div>
             </div>
-            <div className="text-xs text-amber-400 font-medium">
-              あなたの役職：【{myRole ? ROLE_INFO[myRole]?.name : '確認中'}】
-            </div>
           </div>
+
+          <button
+            onClick={onOpenRules}
+            className="text-xs text-stone-400 hover:text-stone-200 p-2.5 rounded-xl bg-stone-950 border border-stone-800 min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer shrink-0"
+            title="掟と役職を確認"
+          >
+            <HelpCircle className="w-4 h-4 text-amber-400" />
+          </button>
         </div>
+      )}
 
-        <button
-          onClick={onOpenRules}
-          className="text-xs text-stone-400 hover:text-stone-200 p-2 rounded-lg bg-stone-900 border border-stone-800"
-          title="掟と役職を確認"
-        >
-          <HelpCircle className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* Mansion Layout / Characters Accordion */}
-      <div className="bg-stone-900/70 border border-stone-800 rounded-xl overflow-hidden">
+      {/* Participants Accordion */}
+      <div className="dark-panel overflow-hidden">
         <button
           onClick={() => setShowMansionMap((prev) => !prev)}
-          className="w-full px-4 py-3 bg-stone-950/60 flex items-center justify-between text-xs font-serif font-bold text-stone-300 hover:bg-stone-950 transition"
+          className="w-full px-4 py-3 bg-stone-950/70 flex items-center justify-between text-xs font-serif font-bold text-stone-300 hover:bg-stone-900 transition min-h-[44px]"
         >
           <div className="flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-amber-400" />
-            <span>屋敷の見取り図・一族の居場所</span>
+            <Users className="w-4 h-4 text-amber-400" />
+            <span>一族の参加者一覧</span>
           </div>
           {showMansionMap ? (
             <ChevronUp className="w-4 h-4 text-stone-500" />
@@ -355,42 +411,58 @@ export function DiscussionPhase({
               {gameState.players.map((p) => {
                 const char = CHARACTERS.find((c) => c.id === p.characterId);
                 const isMe = p.id === currentUserId;
+                if (!char) return null;
+
                 return (
                   <div
                     key={p.id}
-                    className={`p-2.5 rounded-lg border ${
+                    className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 ${
                       isMe
-                        ? 'bg-amber-950/30 border-amber-600/50'
-                        : 'bg-stone-950/50 border-stone-800'
+                        ? 'bg-amber-950/30 border-amber-500/80'
+                        : 'bg-stone-950/70 border-stone-800'
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-stone-200">
-                        {char?.relation}（📍{char?.location}）
+                    <div className="flex items-center gap-2">
+                      <CharacterAvatar
+                        variant={char.id}
+                        size="xs"
+                        showNameplate={false}
+                      />
+                      <span className="font-serif font-bold text-stone-200">
+                        {char.relation}
                       </span>
-                      <span className="text-[11px] text-stone-400">
-                        {p.name} {isMe && '（自）'}
+                      <span className="text-[10px] text-amber-400 font-medium">
+                        📍 {char.location}
                       </span>
                     </div>
-                    <div className="text-[10px] text-stone-500 mt-0.5">
-                      {char?.description}
-                    </div>
+                    <span className="text-[11px] text-stone-400 font-serif">
+                      {p.name} {isMe && '（自）'}
+                    </span>
                   </div>
                 );
               })}
 
               {/* Sickroom */}
               {gameState.sickroomCharacter && (
-                <div className="p-2.5 rounded-lg border border-dashed border-stone-700 bg-stone-950/40 sm:col-span-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-stone-400">
-                      療養室：{gameState.sickroomCharacter.relation}（📍
-                      {gameState.sickroomCharacter.location}）
-                    </span>
-                    <span className="text-[10px] text-stone-500">
-                      投票対象（会話には不参加）
-                    </span>
+                <div className="p-2 sm:p-2.5 rounded-xl border border-stone-800 bg-stone-950/70 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <CharacterAvatar
+                      variant={gameState.sickroomCharacter.id}
+                      size="xs"
+                      showNameplate={false}
+                    />
+                    <div className="truncate">
+                      <span className="font-serif font-bold text-stone-200 mr-1.5">
+                        {gameState.sickroomCharacter.relation}
+                      </span>
+                      <span className="text-[10px] text-amber-400 font-medium">
+                        📍 療養室
+                      </span>
+                    </div>
                   </div>
+                  <span className="text-[11px] text-stone-400 font-serif shrink-0">
+                    ノンプレイヤー
+                  </span>
                 </div>
               )}
             </div>

@@ -16,11 +16,14 @@ import { ResultPhase } from './components/ResultPhase.tsx';
 import { ChatBox } from './components/ChatBox.tsx';
 import { RulesModal } from './components/RulesModal.tsx';
 import { ResetConfirmModal } from './components/ResetConfirmModal.tsx';
+import { ImageSheetModal } from './components/ImageSheetModal.tsx';
 import { AlertCircle, X } from 'lucide-react';
+import mansionStudyBg from './assets/images/mansion_study_bg_1792414771883.jpg';
 
 export default function App() {
   const [rulesOpen, setRulesOpen] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [imageSheetOpen, setImageSheetOpen] = useState(false);
 
   const {
     isConnected,
@@ -34,6 +37,7 @@ export default function App() {
     startGame,
     fillBots,
     removeBots,
+    kickPlayer,
     proceedToDraft,
     draftAction,
     toggleReady,
@@ -49,7 +53,20 @@ export default function App() {
   const currentPhase = gameState?.phase || 'lobby';
 
   return (
-    <div className="min-h-screen bg-stone-950 text-stone-100 flex flex-col font-sans selection:bg-amber-700 selection:text-white">
+    <div className="min-h-screen bg-stone-950 text-stone-100 flex flex-col font-sans selection:bg-amber-700 selection:text-white relative">
+      {/* Dimly lit Victorian Mansion Study Background Image */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <img
+          src={mansionStudyBg}
+          alt="洋館の書斎"
+          className="w-full h-full object-cover object-center opacity-30 filter brightness-70 contrast-125 scale-105 transition-transform duration-1000"
+          referrerPolicy="no-referrer"
+        />
+        {/* Deep ambient vignette and candlelit glow overlays */}
+        <div className="absolute inset-0 bg-gradient-to-b from-stone-950/85 via-stone-950/65 to-stone-950/90" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_25%,rgba(12,10,9,0.85)_100%)]" />
+      </div>
+
       {/* Top Header */}
       <Header
         isConnected={isConnected}
@@ -57,12 +74,13 @@ export default function App() {
         isHost={isHost}
         onOpenRules={() => setRulesOpen(true)}
         onOpenResetConfirm={() => setResetConfirmOpen(true)}
+        onOpenImageSheet={() => setImageSheetOpen(true)}
       />
 
       {/* Error alert toast */}
       {errorMessage && (
         <div className="sticky top-14 z-50 max-w-md mx-auto my-2 px-4">
-          <div className="p-3 bg-red-950 border border-red-700 text-red-200 rounded-xl shadow-2xl flex items-center justify-between gap-2 text-xs">
+          <div className="p-3 bg-red-950/90 border border-red-700 text-red-200 rounded-xl shadow-2xl flex items-center justify-between gap-2 text-xs backdrop-blur-md">
             <div className="flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
               <span>{errorMessage}</span>
@@ -78,7 +96,7 @@ export default function App() {
       )}
 
       {/* Main Content Body */}
-      <main className="flex-1 flex flex-col">
+      <main className="flex-1 flex flex-col relative z-10">
         {currentPhase === 'lobby' && (
           <Lobby
             gameState={gameState}
@@ -88,7 +106,10 @@ export default function App() {
             onStartGame={startGame}
             onFillBots={fillBots}
             onRemoveBots={removeBots}
+            onKickPlayer={kickPlayer}
             onOpenRules={() => setRulesOpen(true)}
+            onOpenImageSheet={() => setImageSheetOpen(true)}
+            onResetRoom={resetRoom}
           />
         )}
 
@@ -168,6 +189,12 @@ export default function App() {
         isOpen={resetConfirmOpen}
         onClose={() => setResetConfirmOpen(false)}
         onConfirmReset={resetRoom}
+      />
+
+      {/* Image Sheet Upload & Crop Modal */}
+      <ImageSheetModal
+        isOpen={imageSheetOpen}
+        onClose={() => setImageSheetOpen(false)}
       />
     </div>
   );

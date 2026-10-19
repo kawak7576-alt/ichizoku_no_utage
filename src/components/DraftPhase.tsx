@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { GameStatePublic, PlayerPrivate, Role } from '../types/game.ts';
 import { ROLE_INFO, CHARACTERS } from '../data/characters.ts';
-import { Check, Shield, Sparkles, Send, Clock, AlertCircle } from 'lucide-react';
+import { Check, Send, Clock, AlertCircle } from 'lucide-react';
+import { CharacterAvatar } from './CharacterAvatar.tsx';
 
 interface DraftPhaseProps {
   gameState: GameStatePublic;
@@ -24,11 +25,7 @@ export function DraftPhase({
   );
   const activeChar = CHARACTERS.find((c) => c.id === activePlayer?.characterId);
 
-  const myPlayer = gameState.players.find((p) => p.id === currentUserId);
-  const myChar = CHARACTERS.find((c) => c.id === myPlayer?.characterId);
   const myConfirmedRole = privateState.role;
-
-  // The cards available to choose from right now (for active player)
   const availableCards = privateState.draftingCards || [];
 
   const handleConfirmChoice = () => {
@@ -48,21 +45,23 @@ export function DraftPhase({
     gameState.currentDraftStep === 1;
 
   return (
-    <div className="max-w-2xl mx-auto my-4 px-4 space-y-6 animate-fade-in pb-16">
-      {/* Header */}
-      <div className="text-center bg-stone-900/80 border border-amber-900/40 rounded-2xl p-5 shadow-xl">
-        <span className="text-xs font-serif font-bold text-amber-400/90 tracking-widest uppercase">
-          役職の密約・カード配布手順
-        </span>
-        <h2 className="text-xl font-serif font-bold text-stone-100 mt-1">
+    <div className="max-w-2xl mx-auto my-1.5 sm:my-3 px-2.5 sm:px-4 space-y-2 sm:space-y-3 animate-fade-in pb-8">
+      {/* Header Info Banner */}
+      <div className="dark-panel p-2.5 sm:p-4 text-center">
+        <div className="flex items-center justify-between pb-1 border-b border-stone-800/80">
+          <span className="text-[10px] sm:text-xs font-serif font-bold text-amber-300 tracking-widest uppercase">
+            役職カード配布
+          </span>
+          <span className="text-[10px] text-stone-400 font-serif">
+            1枚を選んで次へ渡す
+          </span>
+        </div>
+        <h2 className="text-sm sm:text-base font-serif font-black tracking-wider text-amber-100 gold-gradient-text mt-1">
           山札の儀とカードの受け渡し
         </h2>
-        <p className="text-xs text-stone-400 mt-1">
-          第一発見者から順に山札を引き、1枚を自分の役職に選び、もう1枚を次の者へ渡します。
-        </p>
 
-        {/* Turn order indicator */}
-        <div className="flex items-center justify-center gap-1.5 sm:gap-2 mt-4 flex-wrap">
+        {/* Turn order indicator with Character Avatars */}
+        <div className="flex items-center justify-center gap-1 sm:gap-2 mt-2 flex-wrap">
           {gameState.players
             .slice()
             .sort((a, b) => (a.draftOrder || 0) - (b.draftOrder || 0))
@@ -70,21 +69,31 @@ export function DraftPhase({
               const isCurrentTurn = p.id === gameState.currentDraftPlayerId;
               const isMe = p.id === currentUserId;
               const char = CHARACTERS.find((c) => c.id === p.characterId);
+              if (!char) return null;
 
               return (
                 <div
                   key={p.id}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs border transition ${
+                  className={`flex items-center gap-1 px-2 py-1 rounded-xl border transition ${
                     isCurrentTurn
-                      ? 'bg-amber-900/60 border-amber-500 text-amber-200 font-bold scale-105 shadow-md animate-pulse'
-                      : 'bg-stone-950/40 border-stone-800 text-stone-400'
+                      ? 'bg-amber-950/50 border-amber-400 text-amber-200 font-bold scale-105 shadow-md animate-pulse'
+                      : 'bg-stone-950/70 border-stone-800 text-stone-400'
                   }`}
                 >
-                  <span className="font-mono text-[10px] text-stone-500">
-                    {idx + 1}.
-                  </span>
-                  <span>{char?.relation || p.name}</span>
-                  {isMe && <span className="text-[9px] text-amber-400">（自）</span>}
+                  <CharacterAvatar
+                    variant={char.id}
+                    size="xs"
+                    showNameplate={false}
+                  />
+                  <div className="text-left leading-tight">
+                    <span className="text-[9px] text-stone-500 font-mono block">
+                      {idx + 1}人目
+                    </span>
+                    <span className="text-[11px] font-serif">
+                      {char.relation}
+                      {isMe && <span className="text-amber-400 ml-0.5">（自）</span>}
+                    </span>
+                  </div>
                 </div>
               );
             })}
@@ -93,45 +102,45 @@ export function DraftPhase({
 
       {/* Main Action Area */}
       {isMyTurn ? (
-        <div className="bg-gradient-to-b from-stone-900 via-stone-900/95 to-stone-950 border-2 border-amber-500/80 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-5">
-          <div className="flex items-center justify-between pb-3 border-b border-stone-800">
+        <div className="dark-panel p-3 sm:p-5 border-amber-500/80 shadow-2xl space-y-3 sm:space-y-4">
+          <div className="flex items-center justify-between pb-2 border-b border-stone-800">
             <div>
-              <span className="px-2 py-0.5 bg-amber-500 text-stone-950 text-xs font-bold rounded">
+              <span className="px-2 py-0.5 bg-amber-500 text-stone-950 text-[10px] sm:text-xs font-bold rounded-full">
                 あなたの手番
               </span>
-              <h3 className="text-base font-serif font-bold text-stone-100 mt-1">
+              <h3 className="text-xs sm:text-sm font-serif font-black text-amber-100 mt-1">
                 {isFirstDiscoverer
                   ? '【第一発見者】山札から役職を引きました'
                   : '手札から【自分の役職】を1枚選んでください'}
               </h3>
             </div>
-            <Clock className="w-5 h-5 text-amber-400 animate-spin-slow" />
+            <Clock className="w-4 h-4 text-amber-400 animate-spin-slow" />
           </div>
 
           {/* First discoverer special step */}
           {isFirstDiscoverer ? (
             <div className="space-y-4">
-              <div className="p-4 bg-stone-950/80 rounded-xl border border-stone-800 text-center">
+              <div className="p-4 bg-stone-950/90 rounded-xl border border-stone-800 text-center">
                 <p className="text-xs text-stone-400 mb-2">
                   あなたは第一発見者です。山札から引いたあなたの役職カードは：
                 </p>
 
                 {myConfirmedRole && (
-                  <div className="inline-block p-4 bg-amber-950/40 border-2 border-amber-500 rounded-xl shadow-lg">
+                  <div className="inline-block p-4 sm:p-5 bg-stone-950 border-2 border-amber-500/90 rounded-2xl shadow-xl max-w-sm">
                     <span className="text-2xl font-serif font-black text-amber-200 block">
                       {ROLE_INFO[myConfirmedRole]?.name}
                     </span>
-                    <span className="text-xs text-amber-400/90 font-medium">
+                    <span className="text-xs text-amber-400/90 font-medium mt-1 inline-block">
                       陣営：{ROLE_INFO[myConfirmedRole]?.camp}
                     </span>
-                    <p className="text-xs text-stone-300 mt-2 max-w-sm">
+                    <p className="text-xs text-stone-300 mt-2 leading-relaxed">
                       {ROLE_INFO[myConfirmedRole]?.description}
                     </p>
                   </div>
                 )}
               </div>
 
-              <div className="p-3 bg-amber-950/30 border border-amber-900/40 rounded-xl text-xs text-amber-300/90 flex items-start gap-2">
+              <div className="p-3 bg-amber-950/30 border border-amber-900/50 rounded-xl text-xs text-amber-300/90 flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                 <span>
                   山札からさらに1枚を引き、次のプレイヤーに渡します。何が渡るかはあなただけが確認できます。
@@ -140,7 +149,7 @@ export function DraftPhase({
 
               <button
                 onClick={handleFirstPlayerPass}
-                className="w-full py-3.5 bg-gradient-to-r from-amber-700 via-amber-600 to-amber-700 hover:from-amber-600 hover:to-amber-500 text-stone-950 font-serif font-black text-sm tracking-wider rounded-xl shadow-xl flex items-center justify-center gap-2 transition active:scale-[0.99] cursor-pointer"
+                className="w-full gold-btn py-4 rounded-xl font-serif text-sm tracking-widest flex items-center justify-center gap-2 cursor-pointer transition min-h-[50px]"
               >
                 <Send className="w-4 h-4" />
                 <span>もう1枚引いて次のプレイヤーへ渡す</span>
@@ -148,17 +157,13 @@ export function DraftPhase({
             </div>
           ) : (
             /* Steps for Player 2, 3, 4, 5 */
-            <div className="space-y-4">
-              <p className="text-xs text-stone-300 leading-relaxed">
-                前のプレイヤーから受け取ったカードと、山札から引いたカードの2枚です。
-                <br />
-                <strong className="text-amber-300">
-                  1枚を自分の役職に選び、選ばなかったもう1枚を次のプレイヤー（最後の人は療養室）へ渡します。
-                </strong>
+            <div className="space-y-2.5 sm:space-y-3">
+              <p className="text-[11px] sm:text-xs text-stone-300 leading-tight">
+                1枚を自分の役職に選び、もう1枚を次の人へ渡します。
               </p>
 
               {/* Cards selection */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3">
                 {availableCards.map((role, idx) => {
                   const info = ROLE_INFO[role];
                   const isSelected = selectedRole === role;
@@ -167,42 +172,42 @@ export function DraftPhase({
                     <div
                       key={`${role}_${idx}`}
                       onClick={() => setSelectedRole(role)}
-                      className={`cursor-pointer p-4 rounded-xl border-2 transition-all flex flex-col justify-between ${
+                      className={`cursor-pointer p-2.5 sm:p-4 rounded-xl transition-all flex flex-col justify-between min-h-[110px] sm:min-h-[135px] ${
                         isSelected
-                          ? 'bg-amber-950/60 border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.25)] scale-[1.02]'
-                          : 'bg-stone-950/70 border-stone-800 hover:border-stone-700'
+                          ? 'gold-border-strong bg-amber-950/50 scale-[1.02]'
+                          : 'gold-border bg-stone-950/80 hover:border-amber-500/60'
                       }`}
                     >
                       <div>
-                        <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center justify-between mb-1">
                           <span
-                            className={`text-[11px] px-2 py-0.5 rounded-full border ${info.badgeColor}`}
+                            className={`text-[10px] px-1.5 py-0.2 rounded-full border ${info.badgeColor}`}
                           >
                             {info.camp}
                           </span>
                           {isSelected && (
-                            <span className="flex items-center gap-1 text-xs text-amber-400 font-bold">
-                              <Check className="w-3.5 h-3.5" />
+                            <span className="flex items-center gap-0.5 text-[11px] text-amber-400 font-bold">
+                              <Check className="w-3 h-3" />
                               選択中
                             </span>
                           )}
                         </div>
 
-                        <div className="text-lg font-serif font-bold text-stone-100 mb-1">
+                        <div className="text-base sm:text-lg font-serif font-black text-amber-100 mb-0.5">
                           {info.name}
                         </div>
-                        <p className="text-xs text-stone-400 leading-relaxed">
+                        <p className="text-[10px] sm:text-xs text-stone-300 leading-tight">
                           {info.description}
                         </p>
                       </div>
 
-                      <div className="mt-4 pt-3 border-t border-stone-800/80 text-[11px] text-stone-500">
+                      <div className="mt-2 pt-1.5 border-t border-stone-800/80 text-[10px]">
                         {isSelected ? (
-                          <span className="text-amber-300 font-medium">
-                            この役職を自分の秘密にする
+                          <span className="text-amber-300 font-serif font-bold">
+                            ✓ この役職を自分の秘密にする
                           </span>
                         ) : (
-                          <span>タップして選択</span>
+                          <span className="text-stone-500">タップして選択</span>
                         )}
                       </div>
                     </div>
@@ -213,10 +218,10 @@ export function DraftPhase({
               <button
                 onClick={handleConfirmChoice}
                 disabled={!selectedRole}
-                className={`w-full py-3.5 rounded-xl font-serif font-black text-sm tracking-wider flex items-center justify-center gap-2 transition shadow-xl ${
+                className={`w-full py-2.5 sm:py-3.5 rounded-xl font-serif font-black text-xs sm:text-sm tracking-widest flex items-center justify-center gap-2 transition min-h-[44px] ${
                   selectedRole
-                    ? 'bg-gradient-to-r from-amber-700 via-amber-600 to-amber-700 hover:from-amber-600 hover:to-amber-500 text-stone-950 active:scale-[0.99] cursor-pointer'
-                    : 'bg-stone-800 text-stone-500 border border-stone-700 cursor-not-allowed'
+                    ? 'gold-btn cursor-pointer'
+                    : 'bg-stone-900 text-stone-600 border border-stone-800 cursor-not-allowed'
                 }`}
               >
                 <Check className="w-4 h-4" />
@@ -231,13 +236,23 @@ export function DraftPhase({
         </div>
       ) : (
         /* When waiting for another player's draft turn */
-        <div className="bg-stone-900/80 border border-stone-800 rounded-2xl p-6 text-center space-y-4">
-          <div className="w-12 h-12 mx-auto rounded-full bg-amber-950/40 border border-amber-800/60 flex items-center justify-center">
-            <Clock className="w-6 h-6 text-amber-400 animate-spin-slow" />
-          </div>
+        <div className="dark-panel p-6 text-center space-y-4">
+          {activeChar ? (
+            <CharacterAvatar
+              variant={activeChar.id}
+              size="lg"
+              showNameplate={true}
+              nameplateText={activeChar.relation}
+              subText={activeChar?.location ? `📍 ${activeChar.location}` : ''}
+            />
+          ) : (
+            <div className="w-12 h-12 mx-auto rounded-full bg-stone-950 border border-amber-600/60 flex items-center justify-center">
+              <Clock className="w-6 h-6 text-amber-400 animate-spin-slow" />
+            </div>
+          )}
 
           <div>
-            <h3 className="text-base font-serif font-bold text-stone-200">
+            <h3 className="text-base font-serif font-bold text-amber-100">
               【{activeChar?.relation || activePlayer?.name}】が役職を選別中……
             </h3>
             <p className="text-xs text-stone-400 mt-1">
@@ -247,8 +262,8 @@ export function DraftPhase({
 
           {/* Show what you chose already if you already drafted */}
           {myConfirmedRole && (
-            <div className="mt-4 p-3 bg-stone-950/70 border border-stone-800/80 rounded-xl text-left inline-block w-full max-w-sm">
-              <span className="text-[10px] text-stone-500 block uppercase tracking-wider">
+            <div className="mt-4 p-4 bg-stone-950/80 border border-stone-800 rounded-xl text-left inline-block w-full max-w-sm">
+              <span className="text-[10px] text-stone-500 block uppercase tracking-wider font-serif">
                 あなたの秘密の役職（決定済み）
               </span>
               <div className="flex items-center gap-2 mt-1">
@@ -261,7 +276,7 @@ export function DraftPhase({
                   {ROLE_INFO[myConfirmedRole]?.camp}
                 </span>
               </div>
-              <p className="text-[11px] text-stone-400 mt-1">
+              <p className="text-[11px] text-stone-400 mt-1 leading-relaxed">
                 {ROLE_INFO[myConfirmedRole]?.description}
               </p>
             </div>

@@ -1,20 +1,29 @@
 import { CharacterId, CharacterInfo, Role, RoleInfo } from '../types/game.ts';
 
-export const CHARACTERS: CharacterInfo[] = [
+export const HEAD_CHARACTER: CharacterInfo = {
+  id: 'head',
+  relation: '当主',
+  location: '大広間',
+  title: '大広間の当主',
+  description: '担当場所：大広間',
+  avatarIcon: 'Crown',
+};
+
+export const SIBLING_CHARACTERS: CharacterInfo[] = [
   {
     id: 'eldest_son',
     relation: '長男',
     location: '書斎',
     title: '書斎の長男',
-    description: '重厚な本棚に囲まれた書斎を預かる。一族の家系と歴史に詳しい。',
+    description: '担当場所：書斎',
     avatarIcon: 'BookOpen',
   },
   {
     id: 'eldest_daughter',
     relation: '長女',
-    location: 'ギャラリー',
-    title: 'ギャラリーの長女',
-    description: '屋敷の絵画や調度品を管理する。審美眼に長けている。',
+    location: 'アトリエ',
+    title: 'アトリエの長女',
+    description: '担当場所：アトリエ',
     avatarIcon: 'Palette',
   },
   {
@@ -22,15 +31,15 @@ export const CHARACTERS: CharacterInfo[] = [
     relation: '次男',
     location: 'エントランス',
     title: 'エントランスの次男',
-    description: '屋敷の出入り口を見張る。来訪者の顔と時間を記憶している。',
+    description: '担当場所：エントランス',
     avatarIcon: 'DoorOpen',
   },
   {
     id: 'second_daughter',
     relation: '次女',
-    location: '庭園',
-    title: '庭園の次女',
-    description: '広大な薔薇の温室と庭園を好む。風の噂や屋外の異変に敏感。',
+    location: '温室',
+    title: '温室の次女',
+    description: '担当場所：温室',
     avatarIcon: 'Trees',
   },
   {
@@ -38,16 +47,41 @@ export const CHARACTERS: CharacterInfo[] = [
     relation: '三男',
     location: '食堂',
     title: '食堂の三男',
-    description: '晩餐会の準備と給仕を仕切る。宴の進行と料理の配膳を把握。',
-    avatarIcon: 'UtensilsCrossed',
+    description: '担当場所：食堂',
+    avatarIcon: 'Utensils',
   },
   {
     id: 'third_daughter',
     relation: '三女',
     location: '遊戯室',
     title: '遊戯室の三女',
-    description: 'チェス盤やビリヤード台のあるサロンにいる。観察力と機転が武器。',
+    description: '担当場所：遊戯室',
     avatarIcon: 'Dice5',
+  },
+];
+
+export const CHARACTERS: CharacterInfo[] = [
+  HEAD_CHARACTER,
+  ...SIBLING_CHARACTERS,
+];
+
+export const ALL_NINE_CHARACTERS: CharacterInfo[] = [
+  ...CHARACTERS,
+  {
+    id: 'phantom_thief',
+    relation: '怪盗',
+    location: '',
+    title: '怪盗',
+    description: '一族の誰かに変装した怪盗。',
+    avatarIcon: 'Mask',
+  },
+  {
+    id: 'kitsune',
+    relation: '妖狐',
+    location: '',
+    title: '妖狐',
+    description: '一族に紛れ込んだ妖異。',
+    avatarIcon: 'Flame',
   },
 ];
 

@@ -14,7 +14,11 @@ export function useGameSocket() {
   const [privateState, setPrivateState] = useState<PlayerPrivate>({});
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [playerId, setPlayerId] = useState<string>(() => {
-    return sessionStorage.getItem('mansion_player_id') || '';
+    return (
+      sessionStorage.getItem('mansion_player_id') ||
+      localStorage.getItem('mansion_player_id') ||
+      ''
+    );
   });
   const [roomId, setRoomId] = useState<string>('MANSION');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -29,8 +33,12 @@ export function useGameSocket() {
     socket.on('connect', () => {
       setIsConnected(true);
       // Auto-reconnect if we have playerId & playerName
-      const savedPlayer = sessionStorage.getItem('mansion_player_id');
-      const savedName = sessionStorage.getItem('mansion_player_name');
+      const savedPlayer =
+        sessionStorage.getItem('mansion_player_id') ||
+        localStorage.getItem('mansion_player_id');
+      const savedName =
+        sessionStorage.getItem('mansion_player_name') ||
+        localStorage.getItem('mansion_player_name');
       if (savedPlayer) {
         socket.emit('join_room', {
           playerName: savedName || '客人',
@@ -48,6 +56,7 @@ export function useGameSocket() {
       setPlayerId(data.playerId);
       sessionStorage.setItem('mansion_room_id', data.roomId);
       sessionStorage.setItem('mansion_player_id', data.playerId);
+      localStorage.setItem('mansion_player_id', data.playerId);
 
       // Clean URL if any query param was present
       if (window.location.search) {
@@ -60,7 +69,7 @@ export function useGameSocket() {
     });
 
     socket.on('private_state', (pState: PlayerPrivate) => {
-      setPrivateState((prev) => ({ ...prev, ...pState }));
+      setPrivateState(pState || {});
     });
 
     socket.on('chat_history', (messages: ChatMessage[]) => {
@@ -138,6 +147,10 @@ export function useGameSocket() {
     socketRef.current?.emit('reset_room');
   }, []);
 
+  const kickPlayer = useCallback((targetPlayerId: string) => {
+    socketRef.current?.emit('kick_player', { targetPlayerId });
+  }, []);
+
   const sendChat = useCallback((text: string) => {
     socketRef.current?.emit('send_chat', { text });
   }, []);
@@ -163,6 +176,7 @@ export function useGameSocket() {
     startGame,
     fillBots,
     removeBots,
+    kickPlayer,
     proceedToDraft,
     draftAction,
     toggleReady,

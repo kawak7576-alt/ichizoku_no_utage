@@ -13,6 +13,8 @@ import {
   Shield,
   Award,
 } from 'lucide-react';
+import { CharacterAvatar, AvatarVariant } from './CharacterAvatar.tsx';
+import { OrnateCorner, OrnateDivider } from './OrnateFrame.tsx';
 
 interface ResultPhaseProps {
   gameState: GameStatePublic;
@@ -40,43 +42,63 @@ export function ResultPhase({
     switch (result.winner) {
       case 'kitsune':
         return {
-          bg: 'from-amber-950 via-stone-900 to-amber-950',
-          border: 'border-amber-500',
+          bg: 'from-amber-950/90 via-stone-950/95 to-amber-950/90',
+          border: 'border-amber-500/80',
+          innerBorder: 'border-amber-500/30',
           textColor: 'text-amber-200',
           badgeColor: 'bg-amber-500 text-stone-950',
-          icon: '🦊',
+          glow: 'shadow-[0_0_30px_rgba(245,158,11,0.3)]',
+          avatarVariant: 'kitsune' as AvatarVariant,
+          campName: '妖狐陣営の単独完全勝利',
+          symbol: '🦊',
         };
       case 'draw':
         return {
-          bg: 'from-purple-950 via-stone-900 to-amber-950',
-          border: 'border-purple-500',
+          bg: 'from-purple-950/90 via-stone-950/95 to-amber-950/90',
+          border: 'border-purple-500/80',
+          innerBorder: 'border-purple-500/30',
           textColor: 'text-purple-200',
           badgeColor: 'bg-purple-600 text-purple-100',
-          icon: '💨',
+          glow: 'shadow-[0_0_30px_rgba(168,85,247,0.3)]',
+          avatarVariant: 'phantom_thief' as AvatarVariant,
+          campName: '引き分け（怪盗の救済逃走）',
+          symbol: '💨',
         };
       case 'family':
         return {
-          bg: 'from-emerald-950 via-stone-900 to-blue-950',
-          border: 'border-emerald-500',
-          textColor: 'text-emerald-200',
-          badgeColor: 'bg-emerald-600 text-emerald-100',
-          icon: '🏰',
+          bg: 'from-emerald-950/90 via-stone-950/95 to-amber-950/90',
+          border: 'border-amber-500/90',
+          innerBorder: 'border-amber-400/30',
+          textColor: 'text-amber-200',
+          badgeColor: 'bg-gradient-to-r from-emerald-600 to-amber-600 text-white',
+          glow: 'shadow-[0_0_30px_rgba(234,179,8,0.35)]',
+          avatarVariant: 'eldest_son' as AvatarVariant, // 一族陣営の勝利：長男のアイコン！
+          campName: '一族陣営の勝利（家宝奪還）',
+          symbol: '🏰',
         };
       case 'phantom_thief':
         return {
-          bg: 'from-purple-950 via-stone-900 to-purple-950',
-          border: 'border-purple-600',
+          bg: 'from-purple-950/90 via-stone-950/95 to-stone-950/95',
+          border: 'border-purple-500/90',
+          innerBorder: 'border-purple-400/30',
           textColor: 'text-purple-200',
           badgeColor: 'bg-purple-600 text-purple-100',
-          icon: '🎭',
+          glow: 'shadow-[0_0_30px_rgba(168,85,247,0.35)]',
+          avatarVariant: 'phantom_thief' as AvatarVariant, // 怪盗の勝利：怪盗のアイコン！
+          campName: '怪盗の勝利（変装逃亡）',
+          symbol: '🎭',
         };
       default:
         return {
-          bg: 'from-stone-900 via-stone-900 to-stone-950',
+          bg: 'from-stone-900/90 via-stone-950/95 to-stone-900/90',
           border: 'border-stone-700',
+          innerBorder: 'border-stone-800',
           textColor: 'text-stone-200',
           badgeColor: 'bg-stone-700 text-stone-200',
-          icon: '⚖️',
+          glow: 'shadow-lg',
+          avatarVariant: 'eldest_son' as AvatarVariant,
+          campName: '決着',
+          symbol: '⚖️',
         };
     }
   };
@@ -84,27 +106,64 @@ export function ResultPhase({
   const banner = getWinnerBanner();
 
   return (
-    <div className="max-w-2xl mx-auto my-4 px-4 space-y-6 animate-fade-in pb-20">
-      {/* Victory Announcement Card */}
+    <div className="max-w-2xl mx-auto my-2 sm:my-4 px-2.5 sm:px-4 space-y-3 sm:space-y-4 animate-fade-in pb-16">
+      {/* Victory Announcement Card with Ornate Victorian Framing & Winner Avatar */}
       <div
-        className={`bg-gradient-to-b ${banner.bg} border-2 ${banner.border} rounded-2xl p-6 sm:p-8 shadow-2xl text-center space-y-4`}
+        className={`relative bg-gradient-to-b ${banner.bg} border-2 ${banner.border} rounded-2xl p-4 sm:p-7 ${banner.glow} text-center space-y-3 overflow-hidden backdrop-blur-md`}
       >
-        <div className="text-4xl mb-1">{banner.icon}</div>
+        {/* Inner concentric hairline border */}
         <div
-          className={`inline-block px-3 py-1 rounded-full text-xs font-serif font-black tracking-widest uppercase ${banner.badgeColor}`}
-        >
-          {result.winnerTitle}
+          className={`absolute inset-[4px] rounded-xl border pointer-events-none ${banner.innerBorder}`}
+        />
+
+        {/* 4 Victorian corner flourishes */}
+        <div className="absolute top-1.5 left-1.5 pointer-events-none">
+          <OrnateCorner position="top-left" className="w-6 h-6 text-amber-400/90" />
+        </div>
+        <div className="absolute top-1.5 right-1.5 pointer-events-none">
+          <OrnateCorner position="top-right" className="w-6 h-6 text-amber-400/90" />
+        </div>
+        <div className="absolute bottom-1.5 left-1.5 pointer-events-none">
+          <OrnateCorner position="bottom-left" className="w-6 h-6 text-amber-400/90" />
+        </div>
+        <div className="absolute bottom-1.5 right-1.5 pointer-events-none">
+          <OrnateCorner position="bottom-right" className="w-6 h-6 text-amber-400/90" />
         </div>
 
-        <p className="text-sm sm:text-base font-serif italic text-stone-200 leading-relaxed max-w-lg mx-auto">
+        {/* Prominent Camp Winner Avatar */}
+        <div className="relative z-10 flex flex-col items-center justify-center pt-1">
+          <div className="relative p-2 rounded-full border-2 border-amber-400/80 bg-stone-950/90 shadow-[0_0_24px_rgba(245,158,11,0.4)] animate-fade-in">
+            <CharacterAvatar
+              variant={banner.avatarVariant}
+              size="lg"
+              showNameplate={false}
+            />
+          </div>
+
+          <div className="mt-2.5">
+            <div
+              className={`inline-block px-3 py-1 rounded-full text-xs font-serif font-black tracking-widest uppercase shadow-md ${banner.badgeColor}`}
+            >
+              {banner.campName}
+            </div>
+            <h2 className="text-lg sm:text-xl font-serif font-black tracking-wider text-amber-100 gold-gradient-text mt-1">
+              {result.winnerTitle}
+            </h2>
+          </div>
+        </div>
+
+        {/* Ornate Flourish Divider */}
+        <OrnateDivider symbol="❖" className="my-1.5" />
+
+        <p className="relative z-10 text-xs sm:text-sm font-serif italic text-stone-200 leading-relaxed max-w-lg mx-auto">
           「{result.narrative}」
         </p>
 
         {/* Rematch Button in Top Card */}
-        <div className="pt-2">
+        <div className="relative z-10 pt-1">
           <button
             onClick={onRematch}
-            className="px-6 py-3 bg-gradient-to-r from-amber-700 via-amber-600 to-amber-700 hover:from-amber-600 hover:to-amber-500 text-stone-950 font-serif font-black text-sm tracking-wider rounded-xl shadow-xl inline-flex items-center gap-2 transition active:scale-95 cursor-pointer"
+            className="px-5 py-2.5 bg-gradient-to-r from-amber-700 via-amber-600 to-amber-700 hover:from-amber-600 hover:to-amber-500 text-stone-950 font-serif font-black text-xs sm:text-sm tracking-wider rounded-xl shadow-xl inline-flex items-center gap-2 transition active:scale-95 cursor-pointer min-h-[42px]"
           >
             <RotateCcw className="w-4 h-4" />
             <span>同じルームでもう一度遊ぶ（再戦）</span>
@@ -113,27 +172,41 @@ export function ResultPhase({
       </div>
 
       {/* Words Revelation */}
-      <div className="bg-stone-900/90 border border-amber-900/40 rounded-2xl p-5 shadow-xl space-y-3">
-        <h3 className="font-serif font-bold text-amber-300 text-sm flex items-center gap-2 pb-2 border-b border-stone-800">
+      <div className="relative bg-stone-950/90 border border-amber-600/50 rounded-2xl p-3.5 sm:p-5 shadow-xl space-y-2.5 backdrop-blur-md">
+        <div className="absolute inset-[3px] rounded-xl border border-amber-500/20 pointer-events-none" />
+        <div className="absolute top-1 left-1 pointer-events-none">
+          <OrnateCorner position="top-left" className="w-4 h-4 text-amber-500/70" />
+        </div>
+        <div className="absolute top-1 right-1 pointer-events-none">
+          <OrnateCorner position="top-right" className="w-4 h-4 text-amber-500/70" />
+        </div>
+        <div className="absolute bottom-1 left-1 pointer-events-none">
+          <OrnateCorner position="bottom-left" className="w-4 h-4 text-amber-500/70" />
+        </div>
+        <div className="absolute bottom-1 right-1 pointer-events-none">
+          <OrnateCorner position="bottom-right" className="w-4 h-4 text-amber-500/70" />
+        </div>
+
+        <h3 className="relative z-10 font-serif font-bold text-amber-300 text-xs sm:text-sm flex items-center gap-2 pb-1.5 border-b border-stone-800">
           <Sparkles className="w-4 h-4 text-amber-400" />
           <span>合言葉（ワードウルフ）の全貌</span>
         </h3>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-center">
-          <div className="p-3 bg-stone-950 rounded-xl border border-blue-900/60">
-            <span className="text-[11px] text-blue-400 font-bold block mb-1">
+        <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 gap-2 text-center">
+          <div className="p-2.5 bg-stone-950 rounded-xl border border-blue-900/60">
+            <span className="text-[10px] text-blue-400 font-bold block mb-0.5">
               正のワード（一族側・3名）
             </span>
-            <div className="text-xl font-serif font-black text-blue-200">
+            <div className="text-lg sm:text-xl font-serif font-black text-blue-200">
               {result.positiveWord}
             </div>
           </div>
 
-          <div className="p-3 bg-stone-950 rounded-xl border border-purple-900/60">
-            <span className="text-[11px] text-purple-400 font-bold block mb-1">
+          <div className="p-2.5 bg-stone-950 rounded-xl border border-purple-900/60">
+            <span className="text-[10px] text-purple-400 font-bold block mb-0.5">
               誤のワード（怪盗側・2名）
             </span>
-            <div className="text-xl font-serif font-black text-purple-200">
+            <div className="text-lg sm:text-xl font-serif font-black text-purple-200">
               {result.negativeWord}
             </div>
           </div>
@@ -193,13 +266,27 @@ export function ResultPhase({
       </div>
 
       {/* Players and Sickroom True Roles Table */}
-      <div className="bg-stone-900/90 border border-amber-900/40 rounded-2xl p-5 shadow-xl space-y-3">
-        <h3 className="font-serif font-bold text-amber-300 text-sm flex items-center gap-2 pb-2 border-b border-stone-800">
+      <div className="relative bg-stone-950/90 border border-amber-600/50 rounded-2xl p-3.5 sm:p-5 shadow-xl space-y-2.5 backdrop-blur-md">
+        <div className="absolute inset-[3px] rounded-xl border border-amber-500/20 pointer-events-none" />
+        <div className="absolute top-1 left-1 pointer-events-none">
+          <OrnateCorner position="top-left" className="w-4 h-4 text-amber-500/70" />
+        </div>
+        <div className="absolute top-1 right-1 pointer-events-none">
+          <OrnateCorner position="top-right" className="w-4 h-4 text-amber-500/70" />
+        </div>
+        <div className="absolute bottom-1 left-1 pointer-events-none">
+          <OrnateCorner position="bottom-left" className="w-4 h-4 text-amber-500/70" />
+        </div>
+        <div className="absolute bottom-1 right-1 pointer-events-none">
+          <OrnateCorner position="bottom-right" className="w-4 h-4 text-amber-500/70" />
+        </div>
+
+        <h3 className="relative z-10 font-serif font-bold text-amber-300 text-xs sm:text-sm flex items-center gap-2 pb-1.5 border-b border-stone-800">
           <Users className="w-4 h-4 text-amber-400" />
           <span>全員の役職・居場所・配布ワード一覧</span>
         </h3>
 
-        <div className="space-y-2 text-xs">
+        <div className="relative z-10 space-y-2 text-xs">
           {gameState.players.map((p) => {
             const char = CHARACTERS.find((c) => c.id === p.characterId);
             const role = result.roles[p.id];
@@ -210,18 +297,27 @@ export function ResultPhase({
             return (
               <div
                 key={p.id}
-                className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
+                className={`p-2.5 sm:p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
                   isMe
-                    ? 'bg-amber-950/30 border-amber-600/50'
-                    : 'bg-stone-950/70 border-stone-800'
+                    ? 'bg-amber-950/30 border-amber-600/60 shadow-sm'
+                    : 'bg-stone-950/80 border-stone-800'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <div className="font-serif font-bold text-stone-200">
-                    {char?.relation}（📍{char?.location}）
-                  </div>
-                  <div className="text-stone-400 text-[11px]">
-                    {p.name} {isMe && '（あなた）'}
+                <div className="flex items-center gap-2.5">
+                  {char && (
+                    <CharacterAvatar
+                      variant={char.id}
+                      size="xs"
+                      showNameplate={false}
+                    />
+                  )}
+                  <div>
+                    <div className="font-serif font-bold text-stone-200">
+                      {char?.relation}（📍{char?.location}）
+                    </div>
+                    <div className="text-stone-400 text-[10px] sm:text-[11px]">
+                      {p.name} {isMe && '（あなた）'}
+                    </div>
                   </div>
                 </div>
 
@@ -245,13 +341,21 @@ export function ResultPhase({
 
           {/* Sickroom Person */}
           {gameState.sickroomCharacter && (
-            <div className="p-3 rounded-xl border border-dashed border-stone-700 bg-stone-950/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Bed className="w-4 h-4 text-stone-500" />
-                <span className="font-bold text-stone-400">
-                  療養室：{gameState.sickroomCharacter.relation}（📍
-                  {gameState.sickroomCharacter.location}）
-                </span>
+            <div className="p-2.5 sm:p-3 rounded-xl border border-stone-800 bg-stone-950/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <CharacterAvatar
+                  variant={gameState.sickroomCharacter.id}
+                  size="xs"
+                  showNameplate={false}
+                />
+                <div>
+                  <div className="font-serif font-bold text-stone-200">
+                    {gameState.sickroomCharacter.relation}（📍療養室）
+                  </div>
+                  <div className="text-stone-400 text-[10px] sm:text-[11px]">
+                    ノンプレイヤー
+                  </div>
+                </div>
               </div>
 
               <div>
@@ -261,7 +365,7 @@ export function ResultPhase({
                       ROLE_INFO[result.roles['sickroom']]?.badgeColor
                     }`}
                   >
-                    療養室の役職：{ROLE_INFO[result.roles['sickroom']]?.name}
+                    役職：{ROLE_INFO[result.roles['sickroom']]?.name}
                   </span>
                 )}
               </div>
@@ -272,10 +376,24 @@ export function ResultPhase({
 
       {/* Voting Breakdown */}
       {voteRecord && (
-        <div className="bg-stone-900/90 border border-stone-800 rounded-2xl p-5 shadow-xl space-y-3">
-          <h3 className="font-serif font-bold text-stone-300 text-sm pb-2 border-b border-stone-800 flex items-center justify-between">
-            <span>投票と指名結果</span>
-            <div className="flex items-center gap-2 text-xs font-normal">
+        <div className="relative bg-stone-950/90 border border-amber-600/50 rounded-2xl p-3.5 sm:p-5 shadow-xl space-y-2.5 backdrop-blur-md">
+          <div className="absolute inset-[3px] rounded-xl border border-amber-500/20 pointer-events-none" />
+          <div className="absolute top-1 left-1 pointer-events-none">
+            <OrnateCorner position="top-left" className="w-4 h-4 text-amber-500/70" />
+          </div>
+          <div className="absolute top-1 right-1 pointer-events-none">
+            <OrnateCorner position="top-right" className="w-4 h-4 text-amber-500/70" />
+          </div>
+          <div className="absolute bottom-1 left-1 pointer-events-none">
+            <OrnateCorner position="bottom-left" className="w-4 h-4 text-amber-500/70" />
+          </div>
+          <div className="absolute bottom-1 right-1 pointer-events-none">
+            <OrnateCorner position="bottom-right" className="w-4 h-4 text-amber-500/70" />
+          </div>
+
+          <h3 className="relative z-10 font-serif font-bold text-stone-200 text-xs sm:text-sm pb-1.5 border-b border-stone-800 flex flex-wrap items-center justify-between gap-1">
+            <span className="text-amber-300">投票と指名結果</span>
+            <div className="flex items-center gap-2 text-[11px] font-normal">
               <span>怪盗指名：</span>
               <strong className="text-purple-300 font-bold">
                 {voteRecord.thiefNominee
@@ -284,7 +402,7 @@ export function ResultPhase({
                     : gameState.players.find((p) => p.id === voteRecord.thiefNominee)?.name
                   : 'なし（同票）'}
               </strong>
-              <span className="ml-2">妖狐指名：</span>
+              <span className="ml-1">妖狐指名：</span>
               <strong className="text-amber-300 font-bold">
                 {voteRecord.kitsuneNominee
                   ? voteRecord.kitsuneNominee === 'sickroom'
@@ -295,7 +413,7 @@ export function ResultPhase({
             </div>
           </h3>
 
-          <div className="space-y-1.5 text-xs">
+          <div className="relative z-10 space-y-1.5 text-xs">
             {gameState.players.map((p) => {
               const tv = voteRecord.thiefVotes[p.id];
               const kv = voteRecord.kitsuneVotes[p.id];
@@ -313,10 +431,10 @@ export function ResultPhase({
               return (
                 <div
                   key={p.id}
-                  className="p-2 rounded-lg bg-stone-950/50 border border-stone-800/80 flex items-center justify-between"
+                  className="p-1.5 sm:p-2 rounded-lg bg-stone-950/70 border border-stone-800 flex items-center justify-between text-[11px]"
                 >
                   <span className="font-medium text-stone-300">{p.name}：</span>
-                  <div className="flex items-center gap-3 text-stone-400">
+                  <div className="flex items-center gap-2 sm:gap-3 text-stone-400">
                     <span>
                       怪盗へ → <strong className="text-purple-300">{targetThiefName}</strong>
                     </span>

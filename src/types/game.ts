@@ -1,14 +1,17 @@
 /**
- * Shared Game Types for "一族の宴 ― 消えた家宝と変装者 ―"
+ * Shared Game Types for "一族の宴 ― 消えた家宝と怪盗と ―"
  */
 
 export type CharacterId =
+  | 'head'
   | 'eldest_son'
   | 'eldest_daughter'
   | 'second_son'
   | 'second_daughter'
   | 'third_son'
-  | 'third_daughter';
+  | 'third_daughter'
+  | 'phantom_thief'
+  | 'kitsune';
 
 export interface CharacterInfo {
   id: CharacterId;

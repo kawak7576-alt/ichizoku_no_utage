@@ -1,5 +1,5 @@
 import { X, ShieldAlert, Award, Users, BookOpen, Sparkles } from 'lucide-react';
-import { ROLE_INFO, CHARACTERS } from '../data/characters.ts';
+import { ROLE_INFO, CHARACTERS, SIBLING_CHARACTERS } from '../data/characters.ts';
 
 interface RulesModalProps {
   isOpen: boolean;
@@ -36,7 +36,7 @@ export function RulesModal({ isOpen, onClose }: RulesModalProps) {
               <span>🏰</span> 世界観
             </h3>
             <p className="text-stone-300">
-              裕福な一族の屋敷。祖父の誕生日会の最中、大切な家宝が盗まれた。
+              裕福な一族の屋敷。当主の宴の最中、大切な家宝が盗まれた。
               怪盗は「ボクは誰かに変装している、探し出してみなヨ」と一族を挑発。
               一族の宴に紛れ込んだ怪盗、そして妖異【妖狐】の化かし合いを見破れ！
             </p>
@@ -45,26 +45,23 @@ export function RulesModal({ isOpen, onClose }: RulesModalProps) {
           {/* Characters and Sickroom */}
           <section>
             <h3 className="font-serif font-bold text-amber-300 text-base mb-3 flex items-center gap-1.5">
-              <Users className="w-4 h-4 text-amber-400" /> 続柄と担当場所（全6種・5人参加＋1人療養室）
+              <Users className="w-4 h-4 text-amber-400" /> 登場人物（6人の兄弟姉妹のうち5人参加＋1人療養室）
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {CHARACTERS.map((char) => (
+              {SIBLING_CHARACTERS.map((char) => (
                 <div
                   key={char.id}
-                  className="bg-stone-950/50 p-2.5 rounded-lg border border-stone-800"
+                  className="bg-stone-950/50 p-2.5 rounded-lg border border-stone-800 text-center"
                 >
-                  <div className="font-bold text-stone-200">{char.relation}</div>
-                  <div className="text-xs text-amber-400/90 font-medium">
-                    📍 {char.location}
-                  </div>
-                  <div className="text-[11px] text-stone-400 mt-1 line-clamp-2">
-                    {char.description}
+                  <div className="font-serif font-bold text-amber-200 text-sm">{char.relation}</div>
+                  <div className="text-xs text-amber-400/90 font-medium mt-0.5">
+                    📍 担当：{char.location}
                   </div>
                 </div>
               ))}
             </div>
-            <div className="mt-2 p-2.5 bg-amber-950/30 border border-amber-900/40 rounded-lg text-xs text-amber-200/90">
-              ※選ばれなかった1人は「療養室で寝込んでいる人物」となります。役職カードが1枚置かれますが、会話には参加しません。投票対象には指定可能です。
+            <div className="mt-2.5 p-2.5 bg-amber-950/30 border border-amber-900/40 rounded-lg text-xs text-amber-200/90 leading-relaxed">
+              ※6人の兄弟姉妹のうち選ばれなかった1人は「療養室で休んでいる人物」となります。役職カードが1枚置かれますが、会話には参加しません。投票対象には指定可能です。当主は進行を見守るため配役されません。
             </div>
           </section>
 
