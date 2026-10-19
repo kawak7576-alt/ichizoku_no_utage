@@ -10,7 +10,7 @@ import {
   Role,
   VoteRecord,
 } from '../src/types/game.ts';
-import { CHARACTERS } from '../src/data/characters.ts';
+import { CHARACTERS, SIBLING_CHARACTERS } from '../src/data/characters.ts';
 import { getRandomWordPair, WordPair } from './words.ts';
 
 interface ServerPlayer {
@@ -78,7 +78,11 @@ export class GameRoom {
   }
 
   public addPlayer(name: string, socketId: string, isBot = false): ServerPlayer {
-    const isHost = this.players.size === 0;
+    const hasConnectedHumanHost = Array.from(this.players.values()).some(
+      (p) => p.isHost && p.isConnected && !p.isBot
+    );
+    const isHost = !isBot && !hasConnectedHumanHost;
+
     const playerId = `player_${Math.random().toString(36).substring(2, 9)}`;
     const player: ServerPlayer = {
       id: playerId,
@@ -89,6 +93,7 @@ export class GameRoom {
       isBot,
     };
     this.players.set(playerId, player);
+    this.ensureActiveHost();
     return player;
   }
 
@@ -104,24 +109,83 @@ export class GameRoom {
   }
 
   public getHost(): ServerPlayer | undefined {
+    // Prefer connected human host
+    for (const p of this.players.values()) {
+      if (p.isHost && p.isConnected && !p.isBot) return p;
+    }
     for (const p of this.players.values()) {
       if (p.isHost) return p;
     }
     return undefined;
   }
 
+  public ensureActiveHost(): ServerPlayer | undefined {
+    // 1. If currently connected human host exists, keep them
+    const currentHost = this.getHost();
+    if (currentHost && currentHost.isConnected && !currentHost.isBot) {
+      return currentHost;
+    }
+
+    // 2. Clear all host flags
+    for (const p of this.players.values()) {
+      p.isHost = false;
+    }
+
+    // 3. Promote first connected human player
+    for (const p of this.players.values()) {
+      if (p.isConnected && !p.isBot) {
+        p.isHost = true;
+        return p;
+      }
+    }
+
+    // 4. Fallback to any human
+    for (const p of this.players.values()) {
+      if (!p.isBot) {
+        p.isHost = true;
+        return p;
+      }
+    }
+
+    // 5. Fallback to first player
+    if (this.players.size > 0) {
+      const first = Array.from(this.players.values())[0];
+      first.isHost = true;
+      return first;
+    }
+
+    return undefined;
+  }
+
+  public cleanDisconnectedInLobby(isSocketAlive?: (socketId: string) => boolean) {
+    if (this.phase !== 'lobby') return;
+    for (const [id, p] of this.players.entries()) {
+      if (!p.isBot) {
+        const alive = p.isConnected && (!isSocketAlive || isSocketAlive(p.socketId));
+        if (!alive) {
+          this.players.delete(id);
+        }
+      }
+    }
+    // If no connected human players remain, clear any leftover bots
+    const hasConnectedHuman = Array.from(this.players.values()).some(
+      (p) => p.isConnected && !p.isBot && (!isSocketAlive || isSocketAlive(p.socketId))
+    );
+    if (!hasConnectedHuman) {
+      this.players.clear();
+    } else {
+      this.ensureActiveHost();
+    }
+  }
+
   public removePlayer(playerId: string) {
     this.players.delete(playerId);
-    // Assign new host if needed
-    if (!this.getHost() && this.players.size > 0) {
-      const nextHost = Array.from(this.players.values())[0];
-      nextHost.isHost = true;
-    }
+    this.ensureActiveHost();
   }
 
   public fillWithBots() {
     if (this.phase !== 'lobby') return;
-    const botNames = ['従者カイン', '令嬢クララ', '執事セバス', '医師ヘンリー'];
+    const botNames = ['書生アラン', '令嬢クララ', '青年カイン', '画商エリック'];
     let idx = 0;
     while (this.players.size < 5) {
       const name = botNames[idx % botNames.length] + ` (${this.players.size + 1})`;
@@ -143,13 +207,15 @@ export class GameRoom {
     if (this.players.size !== 5) return false;
     this.phase = 'opening';
     this.assignCharacters();
-    this.addSystemMessage('屋敷の宴が始まりました。祖父の大切な家宝が盗まれました……！');
+    this.addSystemMessage('屋敷の宴が始まりました。当主の大切な家宝が盗まれました……！');
     return true;
   }
 
   private assignCharacters() {
-    // 6 characters shuffled
-    const shuffledChars = [...CHARACTERS].sort(() => Math.random() - 0.5);
+    // Exactly 5 players chosen from the 6 siblings (長男、長女、次男、次女、三男、三女).
+    // The 6th sibling goes to the sickroom (療養室).
+    // Head (当主) is not chosen as a player.
+    const shuffledChars = [...SIBLING_CHARACTERS].sort(() => Math.random() - 0.5);
     const playerArray = Array.from(this.players.values());
 
     for (let i = 0; i < 5; i++) {
@@ -361,7 +427,7 @@ export class GameRoom {
 
     if (phase === 'first_discussion') {
       this.addSystemMessage(
-        '【第一討論】が開始されました（3分）。祖父や一族について自由に語り合いましょう。※ワードはまだ非公開です。'
+        '【第一討論】が開始されました（3分）。当主や一族について自由に語り合いましょう。※ワードはまだ非公開です。'
       );
     } else if (phase === 'word_wolf') {
       this.addSystemMessage(
@@ -843,20 +909,13 @@ export class GameRoom {
     this.salvationSuccess = undefined;
     this.result = undefined;
 
-    for (const p of this.players.values()) {
-      p.characterId = undefined;
-      p.role = undefined;
-      p.word = undefined;
-      p.wordType = undefined;
-      p.kitsuneDesignatedWord = undefined;
-      p.kitsuneDeclared = false;
-      p.draftingCards = undefined;
-      p.draftOrder = undefined;
-      p.isReadyNext = false;
-      p.hasVoted = false;
-      p.thiefVote = undefined;
-      p.kitsuneVote = undefined;
+    this.removeBots();
+    for (const [id, p] of this.players.entries()) {
+      if (!p.isConnected && !p.isBot) {
+        this.players.delete(id);
+      }
     }
+    this.ensureActiveHost();
 
     this.addSystemMessage('ルームがリセットされました。再戦の準備が完了しました！');
   }
