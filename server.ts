@@ -12,14 +12,27 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+
+// Ensure public/characters directory exists
+const charactersDir = path.resolve(__dirname, 'public', 'characters');
+if (!fs.existsSync(charactersDir)) {
+  fs.mkdirSync(charactersDir, { recursive: true });
+}
+
+// Serve static assets from public folder
+app.use(express.static(path.resolve(__dirname, 'public')));
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
     origin: '*',
   },
+  pingInterval: 5000,
+  pingTimeout: 7000,
 });
+
+const isSocketAlive = (socketId: string) => io.sockets.sockets.has(socketId);
 
 const isProd = process.env.NODE_ENV === 'production';
 const PORT = Number(process.env.PORT) || 3000;
@@ -82,6 +95,53 @@ app.get('/api/download-zip', (req, res) => {
   }
 });
 
+// Upload cropped character sheet images (9 characters)
+app.post('/api/upload-character-sheet', (req, res) => {
+  try {
+    const { characters } = req.body; // Record<string, string (dataURL)>
+    if (!characters || typeof characters !== 'object') {
+      return res.status(400).json({ error: 'Invalid characters object' });
+    }
+
+    const savedKeys: string[] = [];
+    for (const [id, dataUrl] of Object.entries(characters)) {
+      if (typeof dataUrl === 'string' && dataUrl.startsWith('data:image/')) {
+        const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+        const filePath = path.join(charactersDir, `${id}.png`);
+        fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+        savedKeys.push(id);
+      }
+    }
+
+    io.emit('characters_updated', {
+      timestamp: Date.now(),
+      available: savedKeys,
+    });
+
+    console.log(`Saved ${savedKeys.length} character images into ${charactersDir}`);
+    res.json({ success: true, count: savedKeys.length, saved: savedKeys });
+  } catch (err) {
+    console.error('Error saving character sheet:', err);
+    res.status(500).json({ error: 'Failed to save character images' });
+  }
+});
+
+// List available uploaded character images
+app.get('/api/characters/list', (req, res) => {
+  try {
+    if (!fs.existsSync(charactersDir)) {
+      return res.json({ available: [] });
+    }
+    const files = fs.readdirSync(charactersDir);
+    const available = files
+      .filter((f) => f.endsWith('.png') || f.endsWith('.jpg'))
+      .map((f) => path.parse(f).name);
+    res.json({ available });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to list character images' });
+  }
+});
+
 // Socket.io handling
 io.on('connection', (socket: Socket) => {
   let currentPlayerId: string | null = null;
@@ -93,6 +153,11 @@ io.on('connection', (socket: Socket) => {
       const { playerName, playerId } = data;
       const room = getOrCreateRoom(UNIFIED_ROOM_ID);
 
+      // In lobby phase, clean up stale disconnected ghost players first
+      if (room.phase === 'lobby') {
+        room.cleanDisconnectedInLobby(isSocketAlive);
+      }
+
       // Reconnect check
       let player = playerId ? room.getPlayer(playerId) : undefined;
 
@@ -103,15 +168,35 @@ io.on('connection', (socket: Socket) => {
         if (playerName && !player.isBot) {
           player.name = playerName.trim() || player.name;
         }
+        room.ensureActiveHost();
       } else {
         // New player
         if (room.phase !== 'lobby') {
-          socket.emit('error_message', 'ゲームが既に進行中のため参加できません');
-          return;
+          // If room has no active connected humans, auto-reset so returning user can play
+          const hasConnectedHuman = Array.from(room.players.values()).some(
+            (p) => p.isConnected && !p.isBot && isSocketAlive(p.socketId)
+          );
+          if (!hasConnectedHuman) {
+            room.resetForRematch();
+          } else {
+            socket.emit('error_message', 'ゲームが既に進行中のため参加できません');
+            return;
+          }
         }
+
+        // If bots filled the room in lobby, kick bots to make space for humans
         if (room.players.size >= 5) {
-          socket.emit('error_message', '定員（5名）に達しています');
-          return;
+          const bots = Array.from(room.players.values()).filter((p) => p.isBot);
+          if (bots.length > 0) {
+            room.removePlayer(bots[bots.length - 1].id);
+          } else {
+            // Also check if any inactive humans can be cleaned
+            room.cleanDisconnectedInLobby(isSocketAlive);
+            if (room.players.size >= 5) {
+              socket.emit('error_message', '定員（5名）に達しています');
+              return;
+            }
+          }
         }
 
         const cleanName = (playerName || '客人').trim().substring(0, 12);
@@ -139,7 +224,16 @@ io.on('connection', (socket: Socket) => {
   socket.on('reset_room', () => {
     const room = getOrCreateRoom(UNIFIED_ROOM_ID);
     room.resetForRematch();
-    room.addSystemMessage('ゲームがリセットされ、マッチング画面に戻りました。');
+    room.cleanDisconnectedInLobby(isSocketAlive);
+    if (currentPlayerId) {
+      const p = room.getPlayer(currentPlayerId);
+      if (p) {
+        for (const other of room.players.values()) other.isHost = false;
+        p.isHost = true;
+      }
+    }
+    room.ensureActiveHost();
+    room.addSystemMessage('ゲームがリセットされ、初期マッチング画面に戻りました。');
     broadcastRoomState(room);
   });
 
@@ -148,7 +242,18 @@ io.on('connection', (socket: Socket) => {
     const room = rooms.get(currentRoomId);
     if (!room) return;
     const player = room.getPlayer(currentPlayerId);
-    if (!player || !player.isHost) return;
+    if (!player) return;
+
+    room.ensureActiveHost();
+    if (!player.isHost) {
+      const activeHost = Array.from(room.players.values()).find(
+        (p) => p.isHost && p.isConnected && !p.isBot
+      );
+      if (!activeHost) {
+        player.isHost = true;
+      }
+    }
+    if (!player.isHost) return;
 
     if (room.players.size !== 5) {
       socket.emit('error_message', '5人揃うまでゲームを開始できません');
@@ -165,10 +270,15 @@ io.on('connection', (socket: Socket) => {
     const room = rooms.get(currentRoomId);
     if (!room) return;
     const player = room.getPlayer(currentPlayerId);
-    if (!player || !player.isHost) return;
+    if (!player) return;
 
-    room.fillWithBots();
-    broadcastRoomState(room);
+    room.cleanDisconnectedInLobby(isSocketAlive);
+    if (room.phase === 'lobby') {
+      player.isHost = true;
+      room.ensureActiveHost();
+      room.fillWithBots();
+      broadcastRoomState(room);
+    }
   });
 
   socket.on('remove_bots', () => {
@@ -176,10 +286,24 @@ io.on('connection', (socket: Socket) => {
     const room = rooms.get(currentRoomId);
     if (!room) return;
     const player = room.getPlayer(currentPlayerId);
-    if (!player || !player.isHost) return;
+    if (!player) return;
 
-    room.removeBots();
-    broadcastRoomState(room);
+    if (room.phase === 'lobby') {
+      room.removeBots();
+      room.ensureActiveHost();
+      broadcastRoomState(room);
+    }
+  });
+
+  socket.on('kick_player', (data: { targetPlayerId: string }) => {
+    if (!currentRoomId) return;
+    const room = rooms.get(currentRoomId);
+    if (!room || room.phase !== 'lobby') return;
+    if (data?.targetPlayerId) {
+      room.removePlayer(data.targetPlayerId);
+      room.cleanDisconnectedInLobby(isSocketAlive);
+      broadcastRoomState(room);
+    }
   });
 
   socket.on('proceed_to_draft', () => {
@@ -281,6 +405,12 @@ io.on('connection', (socket: Socket) => {
         const player = room.getPlayer(currentPlayerId);
         if (player) {
           player.isConnected = false;
+          if (room.phase === 'lobby') {
+            room.removePlayer(currentPlayerId);
+            room.cleanDisconnectedInLobby(isSocketAlive);
+          } else {
+            room.ensureActiveHost();
+          }
           broadcastRoomState(room);
         }
       }
