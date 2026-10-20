@@ -22,6 +22,7 @@ if (!fs.existsSync(charactersDir)) {
 
 // Serve static assets from public folder
 app.use(express.static(path.resolve(__dirname, 'public')));
+app.use('/characters', express.static(charactersDir));
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
@@ -104,11 +105,21 @@ app.post('/api/upload-character-sheet', (req, res) => {
     }
 
     const savedKeys: string[] = [];
+    const distCharsDir = path.resolve(__dirname, 'dist', 'characters');
+    const hasDist = fs.existsSync(path.resolve(__dirname, 'dist'));
+    if (hasDist && !fs.existsSync(distCharsDir)) {
+      fs.mkdirSync(distCharsDir, { recursive: true });
+    }
+
     for (const [id, dataUrl] of Object.entries(characters)) {
       if (typeof dataUrl === 'string' && dataUrl.startsWith('data:image/')) {
         const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+        const buf = Buffer.from(base64Data, 'base64');
         const filePath = path.join(charactersDir, `${id}.png`);
-        fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+        fs.writeFileSync(filePath, buf);
+        if (hasDist) {
+          fs.writeFileSync(path.join(distCharsDir, `${id}.png`), buf);
+        }
         savedKeys.push(id);
       }
     }
