@@ -62,6 +62,12 @@ export interface PlayerPrivate {
   kitsuneDesignatedWord?: string;
   kitsuneDeclared?: boolean;
   draftingCards?: Role[]; // Cards currently in hand during draft step
+  passedCard?: {
+    targetPlayerId: string;
+    targetPlayerName: string;
+    targetCharacterRelation: string;
+    role: Role;
+  };
   salvationEligible?: boolean;
 }
 

@@ -85,6 +85,12 @@ export function useGameSocket() {
       setTimeout(() => setErrorMessage(null), 5000);
     });
 
+    socket.on('characters_updated', (data: { available?: string[] }) => {
+      window.dispatchEvent(
+        new CustomEvent('mansion_characters_updated', { detail: data })
+      );
+    });
+
     return () => {
       socket.disconnect();
     };

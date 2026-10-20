@@ -37,7 +37,7 @@ export function useCharacterAvatars() {
     return initial;
   });
 
-  const refreshAvatars = () => {
+  const refreshAvatars = (serverAvailable?: string[]) => {
     const next: Record<string, string> = {};
     const keys = [
       'head',
@@ -63,30 +63,45 @@ export function useCharacterAvatars() {
       }
     });
 
-    avatarCache = next;
-    setAvatars(next);
+    // Check server available images if provided or cached
+    const applyServerList = (availableList: string[]) => {
+      const now = Date.now();
+      availableList.forEach((id) => {
+        if (!next[id]) {
+          next[id] = `/characters/${id}.png?v=${now}`;
+        }
+      });
+      avatarCache = { ...next };
+      setAvatars({ ...next });
+    };
+
+    if (serverAvailable && Array.isArray(serverAvailable) && serverAvailable.length > 0) {
+      applyServerList(serverAvailable);
+    } else {
+      fetch('/api/characters/list')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && Array.isArray(data.available)) {
+            applyServerList(data.available);
+          } else {
+            avatarCache = next;
+            setAvatars(next);
+          }
+        })
+        .catch(() => {
+          avatarCache = next;
+          setAvatars(next);
+        });
+    }
   };
 
   useEffect(() => {
     // Initial fetch from server for any existing uploaded images
-    fetch('/api/characters/list')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data && Array.isArray(data.available) && data.available.length > 0) {
-          const updated: Record<string, string> = { ...avatarCache };
-          data.available.forEach((id: string) => {
-            if (!updated[id]) {
-              updated[id] = `/characters/${id}.png?v=${Date.now()}`;
-            }
-          });
-          avatarCache = updated;
-          setAvatars(updated);
-        }
-      })
-      .catch(() => {});
+    refreshAvatars();
 
-    const handleUpdate = () => {
-      refreshAvatars();
+    const handleUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ available?: string[] }>;
+      refreshAvatars(customEvent.detail?.available);
     };
 
     window.addEventListener('mansion_characters_updated', handleUpdate);

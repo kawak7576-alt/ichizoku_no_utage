@@ -59,12 +59,12 @@ export default function App() {
         <img
           src={mansionStudyBg}
           alt="洋館の書斎"
-          className="w-full h-full object-cover object-center opacity-30 filter brightness-70 contrast-125 scale-105 transition-transform duration-1000"
+          className="w-full h-full object-cover object-center opacity-55 sm:opacity-65 filter brightness-85 contrast-120 scale-105 transition-transform duration-1000"
           referrerPolicy="no-referrer"
         />
         {/* Deep ambient vignette and candlelit glow overlays */}
-        <div className="absolute inset-0 bg-gradient-to-b from-stone-950/85 via-stone-950/65 to-stone-950/90" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_25%,rgba(12,10,9,0.85)_100%)]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-stone-950/75 via-stone-950/45 to-stone-950/80" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_30%,rgba(12,10,9,0.75)_100%)]" />
       </div>
 
       {/* Top Header */}

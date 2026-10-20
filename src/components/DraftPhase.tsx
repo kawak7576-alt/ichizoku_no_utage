@@ -34,15 +34,31 @@ export function DraftPhase({
     setSelectedRole(null);
   };
 
-  const handleFirstPlayerPass = () => {
-    if (myConfirmedRole) {
-      onDraftAction(myConfirmedRole);
-    }
-  };
-
   const isFirstDiscoverer =
     gameState.firstDiscovererId === currentUserId &&
     gameState.currentDraftStep === 1;
+
+  const myPlayer = gameState.players.find((p) => p.id === currentUserId);
+  const myOrder = myPlayer?.draftOrder || 1;
+  const nextPlayer = gameState.players.find(
+    (p) => p.draftOrder === (myOrder % 5) + 1
+  );
+  const nextChar = CHARACTERS.find((c) => c.id === nextPlayer?.characterId);
+  const nextPlayerRelation = nextChar
+    ? nextChar.relation
+    : myOrder === 5
+    ? '療養室'
+    : '次のプレイヤー';
+  const nextPlayerName = nextPlayer
+    ? nextPlayer.name
+    : myOrder === 5
+    ? 'ノンプレイヤー'
+    : '';
+
+  const unselectedRole = selectedRole
+    ? availableCards.find((r) => r !== selectedRole) ||
+      (availableCards[0] === selectedRole ? availableCards[1] : availableCards[0])
+    : null;
 
   return (
     <div className="max-w-2xl mx-auto my-1.5 sm:my-3 px-2.5 sm:px-4 space-y-2 sm:space-y-3 animate-fade-in pb-8">
@@ -110,133 +126,117 @@ export function DraftPhase({
               </span>
               <h3 className="text-xs sm:text-sm font-serif font-black text-amber-100 mt-1">
                 {isFirstDiscoverer
-                  ? '【第一発見者】山札から役職を引きました'
+                  ? '【第一発見者】山札から2枚の役職カードを引きました'
                   : '手札から【自分の役職】を1枚選んでください'}
               </h3>
+              <p className="text-[11px] text-amber-400/90 font-serif mt-0.5">
+                1枚を自分の役職にし、残る1枚を【{myOrder === 1 ? '2番目のプレイヤー' : nextPlayerRelation}{nextPlayerName ? `（${nextPlayerName}）` : ''}】へ渡します。
+              </p>
             </div>
-            <Clock className="w-4 h-4 text-amber-400 animate-spin-slow" />
+            <Clock className="w-4 h-4 text-amber-400 animate-spin-slow shrink-0" />
           </div>
 
-          {/* First discoverer special step */}
-          {isFirstDiscoverer ? (
-            <div className="space-y-4">
-              <div className="p-4 bg-stone-950/90 rounded-xl border border-stone-800 text-center">
-                <p className="text-xs text-stone-400 mb-2">
-                  あなたは第一発見者です。山札から引いたあなたの役職カードは：
-                </p>
+          <div className="space-y-2.5 sm:space-y-3">
+            {/* Cards selection */}
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+              {availableCards.map((role, idx) => {
+                const info = ROLE_INFO[role];
+                const isSelected = selectedRole === role;
 
-                {myConfirmedRole && (
-                  <div className="inline-block p-4 sm:p-5 bg-stone-950 border-2 border-amber-500/90 rounded-2xl shadow-xl max-w-sm">
-                    <span className="text-2xl font-serif font-black text-amber-200 block">
-                      {ROLE_INFO[myConfirmedRole]?.name}
-                    </span>
-                    <span className="text-xs text-amber-400/90 font-medium mt-1 inline-block">
-                      陣営：{ROLE_INFO[myConfirmedRole]?.camp}
-                    </span>
-                    <p className="text-xs text-stone-300 mt-2 leading-relaxed">
-                      {ROLE_INFO[myConfirmedRole]?.description}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-3 bg-amber-950/30 border border-amber-900/50 rounded-xl text-xs text-amber-300/90 flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                <span>
-                  山札からさらに1枚を引き、次のプレイヤーに渡します。何が渡るかはあなただけが確認できます。
-                </span>
-              </div>
-
-              <button
-                onClick={handleFirstPlayerPass}
-                className="w-full gold-btn py-4 rounded-xl font-serif text-sm tracking-widest flex items-center justify-center gap-2 cursor-pointer transition min-h-[50px]"
-              >
-                <Send className="w-4 h-4" />
-                <span>もう1枚引いて次のプレイヤーへ渡す</span>
-              </button>
-            </div>
-          ) : (
-            /* Steps for Player 2, 3, 4, 5 */
-            <div className="space-y-2.5 sm:space-y-3">
-              <p className="text-[11px] sm:text-xs text-stone-300 leading-tight">
-                1枚を自分の役職に選び、もう1枚を次の人へ渡します。
-              </p>
-
-              {/* Cards selection */}
-              <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                {availableCards.map((role, idx) => {
-                  const info = ROLE_INFO[role];
-                  const isSelected = selectedRole === role;
-
-                  return (
-                    <div
-                      key={`${role}_${idx}`}
-                      onClick={() => setSelectedRole(role)}
-                      className={`cursor-pointer p-2.5 sm:p-4 rounded-xl transition-all flex flex-col justify-between min-h-[110px] sm:min-h-[135px] ${
-                        isSelected
-                          ? 'gold-border-strong bg-amber-950/50 scale-[1.02]'
-                          : 'gold-border bg-stone-950/80 hover:border-amber-500/60'
-                      }`}
-                    >
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <span
-                            className={`text-[10px] px-1.5 py-0.2 rounded-full border ${info.badgeColor}`}
-                          >
-                            {info.camp}
+                return (
+                  <div
+                    key={`${role}_${idx}`}
+                    onClick={() => setSelectedRole(role)}
+                    className={`cursor-pointer p-2.5 sm:p-4 rounded-xl transition-all flex flex-col justify-between min-h-[120px] sm:min-h-[145px] ${
+                      isSelected
+                        ? 'gold-border-strong bg-amber-950/50 scale-[1.02] shadow-[0_0_15px_rgba(245,158,11,0.25)]'
+                        : 'gold-border bg-stone-950/80 hover:border-amber-500/60'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span
+                          className={`text-[10px] px-1.5 py-0.2 rounded-full border ${info.badgeColor}`}
+                        >
+                          {info.camp}
+                        </span>
+                        {isSelected && (
+                          <span className="flex items-center gap-0.5 text-[11px] text-amber-400 font-bold">
+                            <Check className="w-3 h-3" />
+                            選択中
                           </span>
-                          {isSelected && (
-                            <span className="flex items-center gap-0.5 text-[11px] text-amber-400 font-bold">
-                              <Check className="w-3 h-3" />
-                              選択中
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="text-base sm:text-lg font-serif font-black text-amber-100 mb-0.5">
-                          {info.name}
-                        </div>
-                        <p className="text-[10px] sm:text-xs text-stone-300 leading-tight">
-                          {info.description}
-                        </p>
-                      </div>
-
-                      <div className="mt-2 pt-1.5 border-t border-stone-800/80 text-[10px]">
-                        {isSelected ? (
-                          <span className="text-amber-300 font-serif font-bold">
-                            ✓ この役職を自分の秘密にする
-                          </span>
-                        ) : (
-                          <span className="text-stone-500">タップして選択</span>
                         )}
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
 
-              <button
-                onClick={handleConfirmChoice}
-                disabled={!selectedRole}
-                className={`w-full py-2.5 sm:py-3.5 rounded-xl font-serif font-black text-xs sm:text-sm tracking-widest flex items-center justify-center gap-2 transition min-h-[44px] ${
-                  selectedRole
-                    ? 'gold-btn cursor-pointer'
-                    : 'bg-stone-900 text-stone-600 border border-stone-800 cursor-not-allowed'
-                }`}
-              >
-                <Check className="w-4 h-4" />
-                <span>
-                  {selectedRole
-                    ? `【${ROLE_INFO[selectedRole]?.name}】に決定して次の人へ渡す`
-                    : '役職カードを1枚選んでください'}
-                </span>
-              </button>
+                      <div className="text-base sm:text-lg font-serif font-black text-amber-100 mb-0.5">
+                        {info.name}
+                      </div>
+                      <p className="text-[10px] sm:text-xs text-stone-300 leading-tight">
+                        {info.description}
+                      </p>
+                    </div>
+
+                    <div className="mt-2 pt-1.5 border-t border-stone-800/80 text-[10px]">
+                      {isSelected ? (
+                        <span className="text-amber-300 font-serif font-bold">
+                          ✓ 自分用にする
+                        </span>
+                      ) : (
+                        <span className="text-stone-500">タップして選択</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          )}
+
+            {/* Selected preview showing what you keep and what you pass */}
+            {selectedRole && unselectedRole && (
+              <div className="p-2.5 sm:p-3 bg-stone-950/90 rounded-xl border border-amber-600/60 text-xs text-left space-y-1.5 shadow-inner">
+                <div className="flex items-center justify-between text-[11px] text-stone-400">
+                  <span className="font-serif font-bold text-amber-300">カード受け渡しの内訳：</span>
+                  <span className="text-amber-400 font-mono text-[10px]">1枚保持 ⇄ 1枚引き渡し</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-stone-800">
+                  <div className="p-2 bg-stone-900/60 rounded-lg border border-emerald-900/50">
+                    <span className="text-[10px] text-emerald-400 block font-medium">自分の役職（秘密）：</span>
+                    <span className="font-serif font-black text-emerald-200 text-sm">
+                      【{ROLE_INFO[selectedRole]?.name}】
+                    </span>
+                  </div>
+                  <div className="p-2 bg-stone-900/60 rounded-lg border border-amber-900/50">
+                    <span className="text-[10px] text-amber-400 block font-medium">
+                      {myOrder === 1 ? '2番目' : nextPlayerRelation}へ渡すカード：
+                    </span>
+                    <span className="font-serif font-black text-amber-300 text-sm">
+                      【{ROLE_INFO[unselectedRole]?.name}】
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={handleConfirmChoice}
+              disabled={!selectedRole}
+              className={`w-full py-3 sm:py-3.5 rounded-xl font-serif font-black text-xs sm:text-sm tracking-widest flex items-center justify-center gap-2 transition min-h-[46px] ${
+                selectedRole
+                  ? 'gold-btn cursor-pointer'
+                  : 'bg-stone-900 text-stone-600 border border-stone-800 cursor-not-allowed'
+              }`}
+            >
+              <Check className="w-4 h-4" />
+              <span>
+                {selectedRole && unselectedRole
+                  ? `【${ROLE_INFO[selectedRole]?.name}】に決定し、【${ROLE_INFO[unselectedRole]?.name}】を${myOrder === 1 ? '2番目の人' : nextPlayerRelation}へ渡す`
+                  : '役職カードを1枚選んでください'}
+              </span>
+            </button>
+          </div>
         </div>
       ) : (
         /* When waiting for another player's draft turn */
-        <div className="dark-panel p-6 text-center space-y-4">
+        <div className="dark-panel p-4 sm:p-6 text-center space-y-3.5">
           {activeChar ? (
             <CharacterAvatar
               variant={activeChar.id}
@@ -252,35 +252,64 @@ export function DraftPhase({
           )}
 
           <div>
-            <h3 className="text-base font-serif font-bold text-amber-100">
+            <h3 className="text-sm sm:text-base font-serif font-bold text-amber-100">
               【{activeChar?.relation || activePlayer?.name}】が役職を選別中……
             </h3>
-            <p className="text-xs text-stone-400 mt-1">
+            <p className="text-[11px] sm:text-xs text-stone-400 mt-0.5">
               秘密裏にカードの確認と選択を行っています。しばらくお待ちください。
             </p>
           </div>
 
-          {/* Show what you chose already if you already drafted */}
-          {myConfirmedRole && (
-            <div className="mt-4 p-4 bg-stone-950/80 border border-stone-800 rounded-xl text-left inline-block w-full max-w-sm">
-              <span className="text-[10px] text-stone-500 block uppercase tracking-wider font-serif">
-                あなたの秘密の役職（決定済み）
-              </span>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="font-serif font-bold text-amber-200 text-sm">
-                  {ROLE_INFO[myConfirmedRole]?.name}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-lg mx-auto text-left pt-1">
+            {/* Show what you chose already */}
+            {myConfirmedRole && (
+              <div className="p-3 bg-stone-950/80 border border-stone-800 rounded-xl space-y-1">
+                <span className="text-[10px] text-stone-500 block uppercase tracking-wider font-serif">
+                  あなたの秘密の役職（決定済み）
                 </span>
-                <span
-                  className={`text-[10px] px-2 py-0.2 rounded-full border ${ROLE_INFO[myConfirmedRole]?.badgeColor}`}
-                >
-                  {ROLE_INFO[myConfirmedRole]?.camp}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-serif font-bold text-amber-200 text-sm">
+                    {ROLE_INFO[myConfirmedRole]?.name}
+                  </span>
+                  <span
+                    className={`text-[9px] px-1.5 py-0.2 rounded-full border ${ROLE_INFO[myConfirmedRole]?.badgeColor}`}
+                  >
+                    {ROLE_INFO[myConfirmedRole]?.camp}
+                  </span>
+                </div>
+                <p className="text-[10px] text-stone-400 leading-tight">
+                  {ROLE_INFO[myConfirmedRole]?.description}
+                </p>
               </div>
-              <p className="text-[11px] text-stone-400 mt-1 leading-relaxed">
-                {ROLE_INFO[myConfirmedRole]?.description}
-              </p>
-            </div>
-          )}
+            )}
+
+            {/* Show what role you passed to the next player */}
+            {privateState.passedCard && (
+              <div className="p-3 bg-amber-950/30 border border-amber-600/70 rounded-xl space-y-1 shadow">
+                <div className="flex items-center gap-1 text-[10px] text-amber-400 font-serif font-bold">
+                  <Send className="w-3 h-3" />
+                  <span>あなたが渡した役職の記録</span>
+                </div>
+                <div className="text-xs text-stone-200">
+                  <span className="font-serif font-bold text-amber-200">
+                    【{privateState.passedCard.targetCharacterRelation}】
+                  </span>
+                  <span className="text-[10px] text-stone-400 ml-0.5">
+                    （{privateState.passedCard.targetPlayerName}）
+                  </span>
+                  <span className="text-stone-300"> へ：</span>
+                  <div className="mt-1">
+                    <span className="inline-block px-2 py-0.5 bg-stone-950 border border-amber-500/80 rounded font-serif font-bold text-amber-300 text-xs">
+                      【{ROLE_INFO[privateState.passedCard.role]?.name}】
+                    </span>
+                  </div>
+                </div>
+                <p className="text-[9px] text-stone-400 pt-0.5">
+                  ※あなただけの秘密情報です。
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

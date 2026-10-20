@@ -361,30 +361,46 @@ export function DiscussionPhase({
 
       {/* My Character & Role Summary */}
       {myChar && (
-        <div className="dark-panel p-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <CharacterAvatar
-              variant={myChar.id}
-              size="sm"
-              showNameplate={false}
-            />
-            <div className="truncate">
-              <div className="text-xs sm:text-sm font-serif font-bold text-stone-200">
-                {myChar.relation}
-              </div>
-              <div className="text-xs text-amber-400 font-serif font-medium">
-                あなたの役職：【{myRole ? ROLE_INFO[myRole]?.name : '確認中'}】
+        <div className="dark-panel p-3.5 sm:p-4 flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <CharacterAvatar
+                variant={myChar.id}
+                size="sm"
+                showNameplate={false}
+              />
+              <div className="truncate">
+                <div className="text-xs sm:text-sm font-serif font-bold text-stone-200">
+                  {myChar.relation}
+                </div>
+                <div className="text-xs text-amber-400 font-serif font-medium">
+                  あなたの役職：【{myRole ? ROLE_INFO[myRole]?.name : '確認中'}】
+                </div>
               </div>
             </div>
+
+            <button
+              onClick={onOpenRules}
+              className="text-xs text-stone-400 hover:text-stone-200 p-2.5 rounded-xl bg-stone-950 border border-stone-800 min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer shrink-0"
+              title="掟と役職を確認"
+            >
+              <HelpCircle className="w-4 h-4 text-amber-400" />
+            </button>
           </div>
 
-          <button
-            onClick={onOpenRules}
-            className="text-xs text-stone-400 hover:text-stone-200 p-2.5 rounded-xl bg-stone-950 border border-stone-800 min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer shrink-0"
-            title="掟と役職を確認"
-          >
-            <HelpCircle className="w-4 h-4 text-amber-400" />
-          </button>
+          {/* Show passedCard record during discussion */}
+          {privateState.passedCard && (
+            <div className="pt-2 border-t border-stone-800/80 text-[11px] text-stone-300 flex items-center gap-1.5 flex-wrap">
+              <span className="text-amber-400 font-medium">✉️ あなたが配役時に渡した役職：</span>
+              <span className="font-serif font-bold text-amber-200">
+                【{privateState.passedCard.targetCharacterRelation}】（{privateState.passedCard.targetPlayerName}）
+              </span>
+              <span className="text-stone-400">へ</span>
+              <span className="px-2 py-0.5 bg-stone-950 border border-amber-600/70 rounded font-serif font-bold text-amber-300 text-xs">
+                【{ROLE_INFO[privateState.passedCard.role]?.name}】
+              </span>
+            </div>
+          )}
         </div>
       )}
 
