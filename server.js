@@ -902,6 +902,71 @@ var charactersDir = path.resolve(__dirname, "public", "characters");
 if (!fs.existsSync(charactersDir)) {
   fs.mkdirSync(charactersDir, { recursive: true });
 }
+var savedAvatarsJsonPath = path.resolve(__dirname, "server", "saved_avatars.json");
+var memoryCustomAvatars = {};
+function loadSavedAvatars() {
+  try {
+    if (fs.existsSync(savedAvatarsJsonPath)) {
+      const content = fs.readFileSync(savedAvatarsJsonPath, "utf-8");
+      const data = JSON.parse(content);
+      if (data && typeof data === "object") {
+        memoryCustomAvatars = data;
+        const distCharsDir = path.resolve(__dirname, "dist", "characters");
+        const hasDist = fs.existsSync(path.resolve(__dirname, "dist"));
+        if (hasDist && !fs.existsSync(distCharsDir)) {
+          fs.mkdirSync(distCharsDir, { recursive: true });
+        }
+        for (const [id, dataUrl] of Object.entries(memoryCustomAvatars)) {
+          if (typeof dataUrl === "string" && dataUrl.startsWith("data:image/")) {
+            const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, "");
+            const buf = Buffer.from(base64Data, "base64");
+            fs.writeFileSync(path.join(charactersDir, `${id}.png`), buf);
+            if (hasDist) {
+              fs.writeFileSync(path.join(distCharsDir, `${id}.png`), buf);
+            }
+          }
+        }
+        console.log(`Loaded ${Object.keys(memoryCustomAvatars).length} avatars from saved_avatars.json`);
+      }
+    }
+  } catch (err) {
+    console.error("Error loading saved avatars:", err);
+  }
+}
+loadSavedAvatars();
+function persistAvatars(characters) {
+  memoryCustomAvatars = { ...memoryCustomAvatars, ...characters };
+  const distCharsDir = path.resolve(__dirname, "dist", "characters");
+  const hasDist = fs.existsSync(path.resolve(__dirname, "dist"));
+  if (hasDist && !fs.existsSync(distCharsDir)) {
+    fs.mkdirSync(distCharsDir, { recursive: true });
+  }
+  const savedKeys = [];
+  for (const [id, dataUrl] of Object.entries(characters)) {
+    if (typeof dataUrl === "string" && dataUrl.startsWith("data:image/")) {
+      const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, "");
+      const buf = Buffer.from(base64Data, "base64");
+      fs.writeFileSync(path.join(charactersDir, `${id}.png`), buf);
+      if (hasDist) {
+        fs.writeFileSync(path.join(distCharsDir, `${id}.png`), buf);
+      }
+      savedKeys.push(id);
+    }
+  }
+  try {
+    const sDir = path.dirname(savedAvatarsJsonPath);
+    if (!fs.existsSync(sDir)) fs.mkdirSync(sDir, { recursive: true });
+    fs.writeFileSync(savedAvatarsJsonPath, JSON.stringify(memoryCustomAvatars));
+  } catch (e) {
+    console.error("Failed to write saved_avatars.json:", e);
+  }
+  io.emit("characters_updated", {
+    timestamp: Date.now(),
+    available: Object.keys(memoryCustomAvatars),
+    characters: memoryCustomAvatars
+  });
+  return savedKeys;
+}
 app.use(express.static(path.resolve(__dirname, "public")));
 app.use("/characters", express.static(charactersDir));
 var httpServer = createServer(app);
@@ -966,34 +1031,16 @@ app.post("/api/upload-character-sheet", (req, res) => {
     if (!characters || typeof characters !== "object") {
       return res.status(400).json({ error: "Invalid characters object" });
     }
-    const savedKeys = [];
-    const distCharsDir = path.resolve(__dirname, "dist", "characters");
-    const hasDist = fs.existsSync(path.resolve(__dirname, "dist"));
-    if (hasDist && !fs.existsSync(distCharsDir)) {
-      fs.mkdirSync(distCharsDir, { recursive: true });
-    }
-    for (const [id, dataUrl] of Object.entries(characters)) {
-      if (typeof dataUrl === "string" && dataUrl.startsWith("data:image/")) {
-        const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, "");
-        const buf = Buffer.from(base64Data, "base64");
-        const filePath = path.join(charactersDir, `${id}.png`);
-        fs.writeFileSync(filePath, buf);
-        if (hasDist) {
-          fs.writeFileSync(path.join(distCharsDir, `${id}.png`), buf);
-        }
-        savedKeys.push(id);
-      }
-    }
-    io.emit("characters_updated", {
-      timestamp: Date.now(),
-      available: savedKeys
-    });
+    const savedKeys = persistAvatars(characters);
     console.log(`Saved ${savedKeys.length} character images into ${charactersDir}`);
     res.json({ success: true, count: savedKeys.length, saved: savedKeys });
   } catch (err) {
     console.error("Error saving character sheet:", err);
     res.status(500).json({ error: "Failed to save character images" });
   }
+});
+app.get("/api/characters/all", (req, res) => {
+  res.json({ characters: memoryCustomAvatars });
 });
 app.get("/api/characters/list", (req, res) => {
   try {
@@ -1010,6 +1057,29 @@ app.get("/api/characters/list", (req, res) => {
 io.on("connection", (socket) => {
   let currentPlayerId = null;
   let currentRoomId = null;
+  if (Object.keys(memoryCustomAvatars).length > 0) {
+    socket.emit("characters_updated", {
+      timestamp: Date.now(),
+      available: Object.keys(memoryCustomAvatars),
+      characters: memoryCustomAvatars
+    });
+  }
+  socket.on("sync_avatars", (data) => {
+    if (data?.characters && typeof data.characters === "object") {
+      const keys = Object.keys(data.characters);
+      if (keys.length > 0) {
+        persistAvatars(data.characters);
+        console.log(`Synced ${keys.length} avatars from client`);
+      }
+    }
+  });
+  socket.on("request_avatars", () => {
+    socket.emit("characters_updated", {
+      timestamp: Date.now(),
+      available: Object.keys(memoryCustomAvatars),
+      characters: memoryCustomAvatars
+    });
+  });
   socket.on(
     "join_room",
     (data) => {
