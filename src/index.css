@@ -58,7 +58,7 @@
 
 .dark-panel {
   position: relative;
-  background-color: rgba(14, 12, 11, 0.94);
+  background-color: rgba(14, 12, 11, 0.84);
   border: 1.5px solid rgba(217, 119, 6, 0.55);
   border-radius: 0.875rem;
   box-shadow: 
@@ -67,7 +67,7 @@
     inset 0 0 0 2px rgba(18, 16, 14, 0.85),
     inset 0 0 0 3px rgba(245, 158, 11, 0.2),
     inset 0 1px 0 rgba(254, 240, 138, 0.35);
-  backdrop-filter: blur(14px);
+  backdrop-filter: blur(12px);
 }
 
 /* Ornate Victorian decorative frame */

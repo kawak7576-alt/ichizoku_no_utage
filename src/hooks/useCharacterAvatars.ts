@@ -37,7 +37,10 @@ export function useCharacterAvatars() {
     return initial;
   });
 
-  const refreshAvatars = (serverAvailable?: string[]) => {
+  const refreshAvatars = (data?: {
+    available?: string[];
+    characters?: Record<string, string>;
+  }) => {
     const next: Record<string, string> = {};
     const keys = [
       'head',
@@ -52,6 +55,7 @@ export function useCharacterAvatars() {
       'grandfather',
     ];
 
+    // 1. Load from localStorage
     keys.forEach((k) => {
       try {
         const stored = localStorage.getItem(`mansion_avatar_${k}`);
@@ -63,45 +67,75 @@ export function useCharacterAvatars() {
       }
     });
 
-    // Check server available images if provided or cached
-    const applyServerList = (availableList: string[]) => {
-      const now = Date.now();
-      availableList.forEach((id) => {
-        if (!next[id]) {
-          next[id] = `/characters/${id}.png?v=${now}`;
+    // 2. If data passed directly includes character data URLs, apply and persist
+    if (data?.characters && typeof data.characters === 'object') {
+      Object.entries(data.characters).forEach(([id, val]) => {
+        if (typeof val === 'string' && val.startsWith('data:image/')) {
+          next[id] = val;
+          try {
+            localStorage.setItem(`mansion_avatar_${id}`, val);
+          } catch {
+            // ignore
+          }
         }
       });
+      if (next['head'] && !next['grandfather']) {
+        next['grandfather'] = next['head'];
+      }
       avatarCache = { ...next };
       setAvatars({ ...next });
-    };
-
-    if (serverAvailable && Array.isArray(serverAvailable) && serverAvailable.length > 0) {
-      applyServerList(serverAvailable);
-    } else {
-      fetch('/api/characters/list')
-        .then((res) => res.json())
-        .then((data) => {
-          if (data && Array.isArray(data.available)) {
-            applyServerList(data.available);
-          } else {
-            avatarCache = next;
-            setAvatars(next);
-          }
-        })
-        .catch(() => {
-          avatarCache = next;
-          setAvatars(next);
-        });
+      return;
     }
+
+    // 3. Fallback: fetch /api/characters/all from server to get all in-memory avatars
+    fetch('/api/characters/all')
+      .then((res) => res.json())
+      .then((resData) => {
+        if (resData?.characters && typeof resData.characters === 'object') {
+          Object.entries(resData.characters).forEach(([id, val]) => {
+            if (typeof val === 'string' && val.startsWith('data:image/')) {
+              next[id] = val;
+              try {
+                localStorage.setItem(`mansion_avatar_${id}`, val);
+              } catch {
+                // ignore
+              }
+            }
+          });
+          if (next['head'] && !next['grandfather']) {
+            next['grandfather'] = next['head'];
+          }
+        }
+
+        // 4. If files exist on server under /characters/${id}.png
+        if (data?.available && Array.isArray(data.available)) {
+          const now = Date.now();
+          data.available.forEach((id) => {
+            if (!next[id]) {
+              next[id] = `/characters/${id}.png?v=${now}`;
+            }
+          });
+        }
+
+        avatarCache = { ...next };
+        setAvatars({ ...next });
+      })
+      .catch(() => {
+        avatarCache = next;
+        setAvatars({ ...next });
+      });
   };
 
   useEffect(() => {
-    // Initial fetch from server for any existing uploaded images
+    // Initial fetch from server
     refreshAvatars();
 
     const handleUpdate = (e: Event) => {
-      const customEvent = e as CustomEvent<{ available?: string[] }>;
-      refreshAvatars(customEvent.detail?.available);
+      const customEvent = e as CustomEvent<{
+        available?: string[];
+        characters?: Record<string, string>;
+      }>;
+      refreshAvatars(customEvent.detail);
     };
 
     window.addEventListener('mansion_characters_updated', handleUpdate);

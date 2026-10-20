@@ -19,6 +19,7 @@ import { ResetConfirmModal } from './components/ResetConfirmModal.tsx';
 import { ImageSheetModal } from './components/ImageSheetModal.tsx';
 import { AlertCircle, X } from 'lucide-react';
 import mansionStudyBg from './assets/images/mansion_study_bg_1792414771883.jpg';
+import studyMobileBg from './assets/images/study_mobile_bg_1792500178693.jpg';
 
 export default function App() {
   const [rulesOpen, setRulesOpen] = useState(false);
@@ -54,17 +55,20 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-stone-950 text-stone-100 flex flex-col font-sans selection:bg-amber-700 selection:text-white relative">
-      {/* Dimly lit Victorian Mansion Study Background Image */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <img
-          src={mansionStudyBg}
-          alt="洋館の書斎"
-          className="w-full h-full object-cover object-center opacity-55 sm:opacity-65 filter brightness-85 contrast-120 scale-105 transition-transform duration-1000"
-          referrerPolicy="no-referrer"
-        />
-        {/* Deep ambient vignette and candlelit glow overlays */}
-        <div className="absolute inset-0 bg-gradient-to-b from-stone-950/75 via-stone-950/45 to-stone-950/80" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_30%,rgba(12,10,9,0.75)_100%)]" />
+      {/* Atmospheric Victorian Mansion Study Background (Responsive Mobile Vertical + Desktop Landscape) */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden w-full h-[100dvh]">
+        <picture className="w-full h-full block">
+          <source media="(max-width: 639px)" srcSet={studyMobileBg} />
+          <img
+            src={mansionStudyBg}
+            alt="洋館の書斎"
+            className="w-full h-full object-cover object-center opacity-85 sm:opacity-80 filter brightness-95 contrast-115 scale-100 sm:scale-105 transition-opacity duration-300"
+            referrerPolicy="no-referrer"
+          />
+        </picture>
+        {/* Ambient candlelit glow and gentle vignette to preserve text contrast while study stays richly visible */}
+        <div className="absolute inset-0 bg-gradient-to-b from-stone-950/40 via-stone-950/20 to-stone-950/50" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_45%,rgba(12,10,9,0.50)_100%)]" />
       </div>
 
       {/* Top Header */}

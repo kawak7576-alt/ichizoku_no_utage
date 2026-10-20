@@ -45,6 +45,36 @@ export function useGameSocket() {
           playerId: savedPlayer,
         });
       }
+
+      // Auto-sync custom character avatars to server (handles server restarts and Render spin-ups)
+      const localAvatars: Record<string, string> = {};
+      const avatarKeys = [
+        'head',
+        'eldest_son',
+        'eldest_daughter',
+        'second_son',
+        'second_daughter',
+        'third_son',
+        'third_daughter',
+        'phantom_thief',
+        'kitsune',
+        'grandfather',
+      ];
+      for (const k of avatarKeys) {
+        try {
+          const val = localStorage.getItem(`mansion_avatar_${k}`);
+          if (val && val.startsWith('data:image/')) {
+            localAvatars[k] = val;
+          }
+        } catch {
+          // ignore
+        }
+      }
+      if (Object.keys(localAvatars).length > 0) {
+        socket.emit('sync_avatars', { characters: localAvatars });
+      } else {
+        socket.emit('request_avatars');
+      }
     });
 
     socket.on('disconnect', () => {
@@ -85,13 +115,41 @@ export function useGameSocket() {
       setTimeout(() => setErrorMessage(null), 5000);
     });
 
-    socket.on('characters_updated', (data: { available?: string[] }) => {
-      window.dispatchEvent(
-        new CustomEvent('mansion_characters_updated', { detail: data })
-      );
-    });
+    socket.on(
+      'characters_updated',
+      (data: {
+        timestamp?: number;
+        available?: string[];
+        characters?: Record<string, string>;
+      }) => {
+        // Automatically persist received character images into client localStorage
+        if (data?.characters && typeof data.characters === 'object') {
+          for (const [id, dataUrl] of Object.entries(data.characters)) {
+            if (typeof dataUrl === 'string' && dataUrl.startsWith('data:image/')) {
+              try {
+                localStorage.setItem(`mansion_avatar_${id}`, dataUrl);
+              } catch {
+                // ignore quota exceeded if any
+              }
+            }
+          }
+        }
+        window.dispatchEvent(
+          new CustomEvent('mansion_characters_updated', { detail: data })
+        );
+      }
+    );
+
+    const handleClientAvatarSync = (e: Event) => {
+      const custom = e as CustomEvent<{ characters: Record<string, string> }>;
+      if (custom.detail?.characters && socket.connected) {
+        socket.emit('sync_avatars', { characters: custom.detail.characters });
+      }
+    };
+    window.addEventListener('mansion_sync_avatars_to_server', handleClientAvatarSync);
 
     return () => {
+      window.removeEventListener('mansion_sync_avatars_to_server', handleClientAvatarSync);
       socket.disconnect();
     };
   }, []);

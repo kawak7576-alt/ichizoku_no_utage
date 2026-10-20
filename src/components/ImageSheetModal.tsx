@@ -83,8 +83,8 @@ export function ImageSheetModal({ isOpen, onClose, onApplied }: ImageSheetModalP
             const nudge = nudges[idx] || { x: 0, y: 0 };
 
             const canvas = document.createElement('canvas');
-            canvas.width = 400;
-            canvas.height = 400;
+            canvas.width = 320;
+            canvas.height = 320;
             const ctx = canvas.getContext('2d');
             if (ctx) {
               ctx.imageSmoothingEnabled = true;
@@ -116,10 +116,11 @@ export function ImageSheetModal({ isOpen, onClose, onApplied }: ImageSheetModalP
                 cropDimension,
                 0,
                 0,
-                400,
-                400
+                320,
+                320
               );
-              slicedCells.push(canvas.toDataURL('image/png'));
+              // Use lightweight high-quality JPEG (approx 20KB/avatar) to fit mobile localStorage quota perfectly
+              slicedCells.push(canvas.toDataURL('image/jpeg', 0.88));
             }
           }
         }
@@ -248,16 +249,17 @@ export function ImageSheetModal({ isOpen, onClose, onApplied }: ImageSheetModalP
     if (cellImages.length === 0) return;
 
     setIsSaving(true);
-    try {
-      const finalCroppedMap: Record<string, string> = {};
-      cellImages.forEach((imgData, idx) => {
-        const charId = sliceMappings[idx] || DEFAULT_SLICES[idx].id;
-        finalCroppedMap[charId] = imgData;
-      });
+    const finalCroppedMap: Record<string, string> = {};
+    cellImages.forEach((imgData, idx) => {
+      const charId = sliceMappings[idx] || DEFAULT_SLICES[idx].id;
+      finalCroppedMap[charId] = imgData;
+    });
 
-      if (finalCroppedMap['head']) {
-        finalCroppedMap['grandfather'] = finalCroppedMap['head'];
-      }
+    if (finalCroppedMap['head']) {
+      finalCroppedMap['grandfather'] = finalCroppedMap['head'];
+    }
+
+    try {
 
       // 1. Save to localStorage for instant client-side rendering
       Object.entries(finalCroppedMap).forEach(([id, dataUrl]) => {
@@ -279,8 +281,19 @@ export function ImageSheetModal({ isOpen, onClose, onApplied }: ImageSheetModalP
         console.warn('Server save warning:', await response.text());
       }
 
-      // 3. Trigger local broadcast event
-      window.dispatchEvent(new CustomEvent('mansion_characters_updated'));
+      // 3. Trigger local broadcast event with full characters map
+      window.dispatchEvent(
+        new CustomEvent('mansion_characters_updated', {
+          detail: { characters: finalCroppedMap, available: Object.keys(finalCroppedMap) },
+        })
+      );
+
+      // 4. Trigger socket broadcast to all connected players
+      window.dispatchEvent(
+        new CustomEvent('mansion_sync_avatars_to_server', {
+          detail: { characters: finalCroppedMap },
+        })
+      );
 
       setMessage({
         text: '全9人のキャラクター画像を中心調整済みで適用しました！',
@@ -294,7 +307,11 @@ export function ImageSheetModal({ isOpen, onClose, onApplied }: ImageSheetModalP
       }, 1000);
     } catch (err) {
       console.error('Save error:', err);
-      window.dispatchEvent(new CustomEvent('mansion_characters_updated'));
+      window.dispatchEvent(
+        new CustomEvent('mansion_characters_updated', {
+          detail: { characters: finalCroppedMap, available: Object.keys(finalCroppedMap) },
+        })
+      );
       setIsSaving(false);
       setMessage({
         text: 'ローカルに適用しました（サーバー通信完了）',
