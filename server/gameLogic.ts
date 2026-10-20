@@ -28,6 +28,12 @@ interface ServerPlayer {
   kitsuneDeclared?: boolean;
   draftingCards?: Role[];
   draftOrder?: number;
+  passedCard?: {
+    targetPlayerId: string;
+    targetPlayerName: string;
+    targetCharacterRelation: string;
+    role: Role;
+  };
   isReadyNext?: boolean;
   hasVoted?: boolean;
   thiefVote?: string; // target: playerId or 'sickroom'
@@ -255,14 +261,15 @@ export class GameRoom {
     this.currentDraftStep = 1;
     this.carriedCard = undefined;
 
-    // Step 1: First discoverer draws 1 card for themself
+    // Step 1: First discoverer draws 2 cards from deck, chooses 1 and passes the other to Player 2
     const p1 = this.players.get(this.draftOrder[0])!;
     const card1 = this.deck.pop()!;
-    p1.role = card1;
-    p1.draftingCards = [card1];
+    const card2 = this.deck.pop()!;
+    p1.role = undefined;
+    p1.draftingCards = [card1, card2];
 
     this.addSystemMessage(
-      `第一発見者は【${p1.name}】です。山札から1枚目の役職カードを受け取りました。`
+      `第一発見者は【${p1.name}】です。山札から2枚の役職カードを受け取りました。`
     );
 
     this.checkBotDraftAction();
@@ -276,28 +283,6 @@ export class GameRoom {
 
     const player = this.players.get(playerId)!;
 
-    if (this.currentDraftIndex === 0) {
-      // First discoverer has already drawn card 1 as role.
-      // Now first discoverer draws a 2nd card and passes to next player.
-      const card2 = this.deck.pop()!;
-      this.carriedCard = card2;
-      player.draftingCards = undefined; // first discoverer hand clear
-      this.currentDraftIndex = 1; // Move to Player 2
-      this.currentDraftStep = 2;
-
-      const nextPlayer = this.players.get(this.draftOrder[1])!;
-      const card3 = this.deck.pop()!;
-      // Player 2 sees card2 (carried) and card3 (drawn from deck)
-      nextPlayer.draftingCards = [this.carriedCard, card3];
-
-      this.addSystemMessage(
-        `${player.name}がカードを引き、次の【${nextPlayer.name}】へ渡しました。`
-      );
-      this.checkBotDraftAction();
-      return true;
-    }
-
-    // Players 2, 3, 4, 5
     const cards = player.draftingCards || [];
     if (!cards.includes(chosenRole)) return false;
 
@@ -310,12 +295,22 @@ export class GameRoom {
     player.draftingCards = undefined;
 
     if (this.currentDraftIndex < 4) {
+      const nextPlayer = this.players.get(this.draftOrder[this.currentDraftIndex + 1])!;
+      const nextChar = SIBLING_CHARACTERS.find((c) => c.id === nextPlayer.characterId);
+
+      // Record which card was passed to whom
+      player.passedCard = {
+        targetPlayerId: nextPlayer.id,
+        targetPlayerName: nextPlayer.name,
+        targetCharacterRelation: nextChar?.relation || '次のプレイヤー',
+        role: unchosenRole,
+      };
+
       // Pass unchosenRole to next player
       this.carriedCard = unchosenRole;
       this.currentDraftIndex++;
       this.currentDraftStep = this.currentDraftIndex + 1;
 
-      const nextPlayer = this.players.get(this.draftOrder[this.currentDraftIndex])!;
       const drawnCard = this.deck.pop()!;
       nextPlayer.draftingCards = [this.carriedCard, drawnCard];
 
@@ -326,6 +321,12 @@ export class GameRoom {
     } else {
       // 5th player finished! The remaining unchosen card goes to the sickroom!
       this.sickroomRole = unchosenRole;
+      player.passedCard = {
+        targetPlayerId: 'sickroom',
+        targetPlayerName: 'ノンプレイヤー',
+        targetCharacterRelation: this.sickroomCharacter?.relation || '療養室',
+        role: unchosenRole,
+      };
       this.addSystemMessage(
         `${player.name}が役職を選択し、残された最後の1枚が療養室へ置かれました。`
       );
@@ -344,10 +345,7 @@ export class GameRoom {
 
     setTimeout(() => {
       if (this.phase !== 'drafting') return;
-      if (this.currentDraftIndex === 0) {
-        // Player 1 auto-passes
-        this.handleDraftAction(player.id, player.role!);
-      } else if (player.draftingCards && player.draftingCards.length > 0) {
+      if (player.draftingCards && player.draftingCards.length > 0) {
         const choice =
           player.draftingCards[
             Math.floor(Math.random() * player.draftingCards.length)
@@ -1021,6 +1019,10 @@ export class GameRoom {
     // Only reveal player's own role after assigned
     if (p.role) {
       privateData.role = p.role;
+    }
+
+    if (p.passedCard) {
+      privateData.passedCard = p.passedCard;
     }
 
     // Only reveal word during word_wolf, final_discussion, voting, salvation, result
