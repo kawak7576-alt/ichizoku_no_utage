@@ -17,6 +17,7 @@ import { ChatBox } from './components/ChatBox.tsx';
 import { RulesModal } from './components/RulesModal.tsx';
 import { ResetConfirmModal } from './components/ResetConfirmModal.tsx';
 import { ImageSheetModal } from './components/ImageSheetModal.tsx';
+import { RoleSettingsModal } from './components/RoleSettingsModal.tsx';
 import { AlertCircle, X } from 'lucide-react';
 import mansionStudyBg from './assets/images/mansion_study_bg_1792414771883.jpg';
 import studyMobileBg from './assets/images/study_mobile_bg_1792500178693.jpg';
@@ -25,6 +26,7 @@ export default function App() {
   const [rulesOpen, setRulesOpen] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [imageSheetOpen, setImageSheetOpen] = useState(false);
+  const [roleSettingsOpen, setRoleSettingsOpen] = useState(false);
 
   const {
     isConnected,
@@ -49,6 +51,7 @@ export default function App() {
     resetRoom,
     sendChat,
     clearError,
+    setRoleConfig,
   } = useGameSocket();
 
   const currentPhase = gameState?.phase || 'lobby';
@@ -114,6 +117,7 @@ export default function App() {
             onOpenRules={() => setRulesOpen(true)}
             onOpenImageSheet={() => setImageSheetOpen(true)}
             onResetRoom={resetRoom}
+            onOpenRoleSettings={() => setRoleSettingsOpen(true)}
           />
         )}
 
@@ -199,6 +203,16 @@ export default function App() {
       <ImageSheetModal
         isOpen={imageSheetOpen}
         onClose={() => setImageSheetOpen(false)}
+      />
+
+      {/* Role Settings Modal (秀才あり / 学生4人) */}
+      <RoleSettingsModal
+        isOpen={roleSettingsOpen}
+        onClose={() => setRoleSettingsOpen(false)}
+        includeProdigy={gameState?.includeProdigy !== false}
+        onSelectConfig={(choice) => setRoleConfig(choice)}
+        isHost={isHost}
+        currentPhase={currentPhase}
       />
     </div>
   );

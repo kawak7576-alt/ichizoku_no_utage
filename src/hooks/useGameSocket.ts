@@ -24,13 +24,24 @@ export function useGameSocket() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    let disconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
     const socket = io({
       transports: ['websocket', 'polling'],
       autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
     });
     socketRef.current = socket;
 
     socket.on('connect', () => {
+      if (disconnectTimer) {
+        clearTimeout(disconnectTimer);
+        disconnectTimer = null;
+      }
       setIsConnected(true);
       // Auto-reconnect if we have playerId & playerName
       const savedPlayer =
@@ -78,7 +89,13 @@ export function useGameSocket() {
     });
 
     socket.on('disconnect', () => {
-      setIsConnected(false);
+      // Debounce visual disconnect so quick transport switches don't blink red
+      if (!disconnectTimer) {
+        disconnectTimer = setTimeout(() => {
+          setIsConnected(false);
+          disconnectTimer = null;
+        }, 2000);
+      }
     });
 
     socket.on('room_joined', (data: { roomId: string; playerId: string; isHost: boolean }) => {
@@ -223,6 +240,10 @@ export function useGameSocket() {
     setErrorMessage(null);
   }, []);
 
+  const setRoleConfig = useCallback((includeProdigy: boolean) => {
+    socketRef.current?.emit('set_role_config', { includeProdigy });
+  }, []);
+
   const currentPlayer = gameState?.players.find((p) => p.id === playerId);
   const isHost = !!currentPlayer?.isHost;
 
@@ -251,5 +272,6 @@ export function useGameSocket() {
     resetRoom,
     sendChat,
     clearError,
+    setRoleConfig,
   };
 }

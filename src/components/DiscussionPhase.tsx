@@ -142,22 +142,26 @@ export function DiscussionPhase({
           </div>
 
           {/* Large Countdown (0秒到達後、赤文字で2:00カウントダウン) */}
-          <div className="flex items-center gap-2 self-start sm:self-auto">
+          <div className="flex items-center gap-2 self-start sm:self-auto relative z-20">
             <div
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl border font-mono font-black text-xl sm:text-2xl tracking-widest shadow-inner min-h-[48px] ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl border font-mono font-black text-xl sm:text-2xl tracking-widest shadow-lg min-h-[48px] isolate ${
                 isExtensionActive
-                  ? 'bg-red-950/90 border-2 border-red-500 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)] animate-pulse'
+                  ? 'bg-red-950 border-2 border-red-500 text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.45)] ring-1 ring-red-500/50'
                   : secondsLeft <= 30
-                  ? 'bg-amber-950/60 border-amber-600 text-amber-300 animate-pulse'
+                  ? 'bg-amber-950 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.3)]'
                   : 'bg-stone-950 border-stone-800 text-stone-100'
               }`}
             >
               <Clock
-                className={`w-5 h-5 ${
-                  isExtensionActive ? 'text-red-500' : 'text-amber-400'
+                className={`w-5 h-5 shrink-0 ${
+                  isExtensionActive
+                    ? 'text-red-400 animate-pulse'
+                    : secondsLeft <= 30
+                    ? 'text-amber-400 animate-pulse'
+                    : 'text-amber-400'
                 }`}
               />
-              <span className={isExtensionActive ? 'text-red-500 font-black' : ''}>
+              <span className={`tabular-nums ${isExtensionActive ? 'text-red-400' : ''}`}>
                 {formatTimer(secondsLeft)}
               </span>
             </div>

@@ -1,5 +1,17 @@
 import { useState } from 'react';
-import { Copy, Check, BookOpen, Crown, Users, RotateCcw, Download, Image as ImageIcon } from 'lucide-react';
+import {
+  Copy,
+  Check,
+  BookOpen,
+  Crown,
+  Users,
+  RotateCcw,
+  Download,
+  Image as ImageIcon,
+  Share2,
+} from 'lucide-react';
+import { PhantomThiefIcon } from './PhantomThiefIcon.tsx';
+import { useCharacterAvatars } from '../hooks/useCharacterAvatars.ts';
 
 interface HeaderProps {
   isConnected: boolean;
@@ -8,6 +20,8 @@ interface HeaderProps {
   onOpenRules: () => void;
   onOpenResetConfirm: () => void;
   onOpenImageSheet?: () => void;
+  onOpenRoleSettings?: () => void;
+  includeProdigy?: boolean;
 }
 
 export function Header({
@@ -17,14 +31,43 @@ export function Header({
   onOpenRules,
   onOpenResetConfirm,
   onOpenImageSheet,
+  onOpenRoleSettings,
+  includeProdigy = true,
 }: HeaderProps) {
   const [copied, setCopied] = useState(false);
+  const { avatars } = useCharacterAvatars();
+  const customThiefAvatar = avatars['phantom_thief'];
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     const cleanUrl = window.location.origin + window.location.pathname;
-    navigator.clipboard.writeText(cleanUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const shareTitle = '一族の宴 ― 消えた家宝と怪盗と ―';
+    const shareText = '5人オンライン対戦型・正体隠匿×ワードウルフ推理ゲーム【一族の宴】の屋敷へ招待されました！';
+
+    // 1. Mobile native share API (LINE, Twitter, Messages)
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: `${shareTitle}\n${shareText}\n`,
+          url: cleanUrl,
+        });
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+        return;
+      } catch {
+        // Fallback to clipboard if user dismissed or cancelled
+      }
+    }
+
+    // 2. Clipboard copy with title and explanation
+    try {
+      const fullCopy = `【${shareTitle}】\n${shareText}\n招待URL: ${cleanUrl}`;
+      await navigator.clipboard.writeText(fullCopy);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // fallback
+    }
   };
 
   return (
@@ -32,8 +75,12 @@ export function Header({
       <div className="max-w-5xl mx-auto flex items-center justify-between gap-1.5 sm:gap-2">
         {/* Left Side: Crest & App Title */}
         <div className="flex items-center gap-1.5 sm:gap-2.5">
-          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-amber-700 via-amber-800 to-stone-950 border border-amber-500/60 flex items-center justify-center shadow-inner">
-            <span className="text-xs sm:text-sm font-serif font-black text-amber-200">宴</span>
+          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-purple-950 via-stone-900 to-amber-950 border border-amber-500/70 flex items-center justify-center shadow-inner overflow-hidden">
+            {customThiefAvatar ? (
+              <img src={customThiefAvatar} alt="怪盗" className="w-full h-full object-cover" />
+            ) : (
+              <PhantomThiefIcon className="w-5 h-5 sm:w-6 sm:h-6 text-amber-300" />
+            )}
           </div>
           <div>
             <h1 className="text-xs sm:text-base font-serif font-black tracking-widest text-amber-100">
@@ -62,18 +109,19 @@ export function Header({
           {/* Invite URL button */}
           <button
             onClick={handleCopy}
-            title="招待URLをコピー"
+            title="タイトルと説明付きで招待URLを送信・コピー"
             className="flex items-center gap-1 px-2 sm:px-2.5 py-1 bg-stone-900/90 hover:bg-stone-800 text-amber-300 rounded-lg text-xs font-medium border border-amber-800/80 transition active:scale-95 cursor-pointer min-h-[32px] sm:min-h-[38px]"
           >
             {copied ? (
               <>
                 <Check className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-emerald-300 font-bold">コピー済</span>
+                <span className="text-emerald-300 font-bold">送信済</span>
               </>
             ) : (
               <>
-                <Copy className="w-3.5 h-3.5 text-amber-400" />
-                <span className="hidden xs:inline">招待</span>
+                <Share2 className="w-3.5 h-3.5 text-amber-400 sm:hidden" />
+                <Copy className="w-3.5 h-3.5 text-amber-400 hidden sm:inline" />
+                <span>招待</span>
               </>
             )}
           </button>

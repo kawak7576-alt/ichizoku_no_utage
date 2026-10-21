@@ -99,11 +99,14 @@ export function RulesModal({ isOpen, onClose }: RulesModalProps) {
               参加者5人には必ず<strong>正のワード3人、誤のワード2人</strong>が配られます（療養室は除外）。
             </p>
             <ul className="list-disc list-inside text-xs text-stone-400 space-y-1">
-              <li><strong className="text-blue-300">秀才</strong>：必ず正のワード</li>
+              <li><strong className="text-blue-300">秀才</strong>：必ず正のワード（※役職設定で秀才ありの場合）</li>
               <li><strong className="text-amber-300">妖狐</strong>：必ず正のワード＋「指定ワード」を会話に自然に入れる</li>
               <li><strong className="text-purple-300">怪盗</strong>：必ず誤のワード</li>
-              <li><strong className="text-emerald-300">学生</strong>：全体の3対2の比率に合わせて正または誤が配られる</li>
+              <li><strong className="text-emerald-300">学生</strong>：全体の3対2の比率に合わせて正または誤が配られる（秀才なし時は4枚）</li>
             </ul>
+            <div className="mt-2 text-[11px] text-amber-300/90 font-serif">
+              ※ヘッダーの「役職設定」ボタンから【秀才あり】または【秀才なし（学生4人）】をいつでも選択可能です。
+            </div>
           </section>
 
           {/* Victory Priorities */}

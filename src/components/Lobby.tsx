@@ -12,11 +12,14 @@ import {
   Download,
   ShieldAlert,
   RotateCcw,
+  Sliders,
 } from 'lucide-react';
 import { GameStatePublic, PlayerPublic } from '../types/game.ts';
 import { CHARACTERS, SIBLING_CHARACTERS } from '../data/characters.ts';
 import { CharacterAvatar } from './CharacterAvatar.tsx';
 import { OrnateCorner, OrnateDivider } from './OrnateFrame.tsx';
+import { PhantomThiefIcon } from './PhantomThiefIcon.tsx';
+import { useCharacterAvatars } from '../hooks/useCharacterAvatars.ts';
 
 interface LobbyProps {
   gameState: GameStatePublic | null;
@@ -30,6 +33,7 @@ interface LobbyProps {
   onOpenRules: () => void;
   onOpenImageSheet?: () => void;
   onResetRoom?: () => void;
+  onOpenRoleSettings?: () => void;
 }
 
 export function Lobby({
@@ -44,7 +48,10 @@ export function Lobby({
   onOpenRules,
   onOpenImageSheet,
   onResetRoom,
+  onOpenRoleSettings,
 }: LobbyProps) {
+  const { avatars } = useCharacterAvatars();
+  const customThiefAvatar = avatars['phantom_thief'];
   const [inputName, setInputName] = useState(() => {
     return sessionStorage.getItem('mansion_player_name') || '探偵';
   });
@@ -80,9 +87,13 @@ export function Lobby({
             <OrnateCorner position="bottom-right" className="w-5 h-5 text-amber-500/80" />
           </div>
 
-          {/* Crest / Emblem */}
-          <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-tr from-amber-950 via-stone-950 to-amber-800 border-2 border-amber-500/60 flex items-center justify-center shadow-xl">
-            <span className="text-4xl font-serif text-amber-200 font-black">宴</span>
+          {/* Crest / Emblem: 怪盗のアイコン */}
+          <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-tr from-purple-950 via-stone-950 to-amber-900 border-2 border-amber-500/60 flex items-center justify-center shadow-xl overflow-hidden">
+            {customThiefAvatar ? (
+              <img src={customThiefAvatar} alt="怪盗" className="w-full h-full object-cover" />
+            ) : (
+              <PhantomThiefIcon className="w-13 h-13 text-amber-300" />
+            )}
           </div>
 
           {/* Central Grand Title */}
@@ -206,22 +217,36 @@ export function Lobby({
             </h2>
           </div>
 
-          <button
-            onClick={handleShare}
-            className="flex items-center gap-1 px-2.5 py-1.5 sm:px-3 sm:py-2 bg-stone-950 hover:bg-stone-900 text-amber-300 text-xs font-serif font-bold rounded-xl border border-amber-600/70 transition active:scale-95 min-h-[38px] sm:min-h-[44px]"
-          >
-            {copied ? (
-              <>
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-emerald-300">コピー完了</span>
-              </>
-            ) : (
-              <>
-                <Share2 className="w-3.5 h-3.5 text-amber-400" />
-                <span>招待URL</span>
-              </>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* 役職設定ボタン（招待URLの左側、四角の秀才マークなし） */}
+            {onOpenRoleSettings && (
+              <button
+                onClick={onOpenRoleSettings}
+                title="役職構成を設定（秀才あり / 秀才なし学生4人）"
+                className="flex items-center gap-1 px-2.5 py-1.5 sm:px-3 sm:py-2 bg-stone-950 hover:bg-stone-900 text-amber-200 text-xs font-serif font-bold rounded-xl border border-amber-600/70 transition active:scale-95 min-h-[38px] sm:min-h-[44px] cursor-pointer"
+              >
+                <Sliders className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span>役職設定</span>
+              </button>
             )}
-          </button>
+
+            <button
+              onClick={handleShare}
+              className="flex items-center gap-1 px-2.5 py-1.5 sm:px-3 sm:py-2 bg-stone-950 hover:bg-stone-900 text-amber-300 text-xs font-serif font-bold rounded-xl border border-amber-600/70 transition active:scale-95 min-h-[38px] sm:min-h-[44px]"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-emerald-300">コピー完了</span>
+                </>
+              ) : (
+                <>
+                  <Share2 className="w-3.5 h-3.5 text-amber-400" />
+                  <span>招待URL</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* 5-Seat Participant Cards with Character Avatars (Side-by-side on all screens) */}
@@ -308,12 +333,12 @@ export function Lobby({
         <div className="space-y-1.5 sm:space-y-2 pt-0.5 sm:pt-1">
           {/* Bot & Reset Toolbar (always available so user is never stuck) */}
           <div className="p-1.5 sm:p-2.5 bg-stone-950/80 rounded-xl border border-stone-800/80 flex flex-wrap items-center justify-between gap-1.5">
-            <div className="text-[11px] text-stone-400 flex items-center gap-1">
+            <div className="text-[11px] text-stone-400 flex items-center gap-1.5 flex-wrap">
               <span className="font-serif font-bold text-stone-300">
                 1人プレイ・調整：
               </span>
-              <span className="text-stone-500 hidden xs:inline">
-                Botで枠を埋めてすぐ開始可能
+              <span className="px-1.5 py-0.5 rounded bg-amber-950/70 border border-amber-600/60 text-amber-300 font-mono text-[10px]">
+                役職：{gameState.includeProdigy !== false ? '秀才あり' : '学生4人'}
               </span>
             </div>
             <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">

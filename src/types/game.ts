@@ -133,5 +133,6 @@ export interface GameStatePublic {
     guess?: string;
     isSuccess?: boolean;
   };
+  includeProdigy?: boolean; // true = 秀才あり (prodigy 1, student 3), false = 秀才なし・学生4人 (student 4)
   result?: GameResult;
 }
