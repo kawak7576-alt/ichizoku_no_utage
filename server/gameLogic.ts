@@ -55,6 +55,9 @@ export class GameRoom {
   public currentDraftStep: number = 1; // 1..6
   public carriedCard?: Role; // Card passed from previous player
 
+  // Role Configuration: true = 秀才あり (prodigy 1, student 3), false = 秀才なし (student 4)
+  public includeProdigy: boolean = true;
+
   // Words
   public currentWordPair?: WordPair;
 
@@ -235,14 +238,9 @@ export class GameRoom {
     if (this.phase !== 'opening') return;
     this.phase = 'drafting';
 
-    const roleCards: Role[] = [
-      'student',
-      'student',
-      'student',
-      'prodigy',
-      'phantom_thief',
-      'kitsune',
-    ];
+    const roleCards: Role[] = this.includeProdigy
+      ? ['student', 'student', 'student', 'prodigy', 'phantom_thief', 'kitsune']
+      : ['student', 'student', 'student', 'student', 'phantom_thief', 'kitsune'];
     this.deck = roleCards.sort(() => Math.random() - 0.5);
 
     const playerList = Array.from(this.players.values());
@@ -994,6 +992,7 @@ export class GameRoom {
       currentDraftPlayerId,
       currentDraftStep: this.currentDraftStep,
       hostPlayerId: this.getHost()?.id || '',
+      includeProdigy: this.includeProdigy,
       voteRecord: this.voteRecord,
       salvation:
         this.phase === 'salvation'
