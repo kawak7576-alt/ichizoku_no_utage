@@ -102,8 +102,9 @@ const io = new Server(httpServer, {
   cors: {
     origin: '*',
   },
-  pingInterval: 5000,
-  pingTimeout: 7000,
+  pingInterval: 25000,
+  pingTimeout: 45000,
+  connectTimeout: 45000,
 });
 
 const isSocketAlive = (socketId: string) => io.sockets.sockets.has(socketId);
@@ -400,6 +401,18 @@ io.on('connection', (socket: Socket) => {
     }
   });
 
+  socket.on('set_role_config', (data: { includeProdigy: boolean }) => {
+    if (!currentRoomId) return;
+    const room = rooms.get(currentRoomId);
+    if (!room) return;
+    room.includeProdigy = !!data.includeProdigy;
+    const msg = room.includeProdigy
+      ? '【役職設定】秀才あり（秀才1 / 学生3 / 怪盗1 / 妖狐1）に設定されました。'
+      : '【役職設定】秀才なし（学生4 / 怪盗1 / 妖狐1）に設定されました。';
+    room.addSystemMessage(msg);
+    broadcastRoomState(room);
+  });
+
   socket.on('proceed_to_draft', () => {
     if (!currentRoomId) return;
     const room = rooms.get(currentRoomId);
@@ -499,13 +512,23 @@ io.on('connection', (socket: Socket) => {
         const player = room.getPlayer(currentPlayerId);
         if (player) {
           player.isConnected = false;
-          if (room.phase === 'lobby') {
-            room.removePlayer(currentPlayerId);
-            room.cleanDisconnectedInLobby(isSocketAlive);
-          } else {
-            room.ensureActiveHost();
-          }
           broadcastRoomState(room);
+
+          // Grace period for mobile reconnections: wait 15 seconds before cleaning up lobby seats
+          const pId = currentPlayerId;
+          setTimeout(() => {
+            if (room.phase === 'lobby') {
+              const curP = room.getPlayer(pId);
+              if (curP && !curP.isConnected && !curP.isBot) {
+                room.removePlayer(pId);
+                room.cleanDisconnectedInLobby(isSocketAlive);
+                broadcastRoomState(room);
+              }
+            } else {
+              room.ensureActiveHost();
+              broadcastRoomState(room);
+            }
+          }, 15000);
         }
       }
     }

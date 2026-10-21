@@ -145,6 +145,9 @@ var GameRoom = class {
     this.currentDraftIndex = 0;
     // 0..4
     this.currentDraftStep = 1;
+    // Card passed from previous player
+    // Role Configuration: true = 秀才あり (prodigy 1, student 3), false = 秀才なし (student 4)
+    this.includeProdigy = true;
     // Timers
     this.phaseStartTime = 0;
     this.phaseDurationSeconds = 0;
@@ -276,14 +279,7 @@ var GameRoom = class {
   proceedToDrafting() {
     if (this.phase !== "opening") return;
     this.phase = "drafting";
-    const roleCards = [
-      "student",
-      "student",
-      "student",
-      "prodigy",
-      "phantom_thief",
-      "kitsune"
-    ];
+    const roleCards = this.includeProdigy ? ["student", "student", "student", "prodigy", "phantom_thief", "kitsune"] : ["student", "student", "student", "student", "phantom_thief", "kitsune"];
     this.deck = roleCards.sort(() => Math.random() - 0.5);
     const playerList = Array.from(this.players.values());
     const firstDiscovererIndex = Math.floor(Math.random() * 5);
@@ -850,6 +846,7 @@ var GameRoom = class {
       currentDraftPlayerId,
       currentDraftStep: this.currentDraftStep,
       hostPlayerId: this.getHost()?.id || "",
+      includeProdigy: this.includeProdigy,
       voteRecord: this.voteRecord,
       salvation: this.phase === "salvation" ? {
         active: true,
@@ -974,8 +971,9 @@ var io = new Server(httpServer, {
   cors: {
     origin: "*"
   },
-  pingInterval: 5e3,
-  pingTimeout: 7e3
+  pingInterval: 25e3,
+  pingTimeout: 45e3,
+  connectTimeout: 45e3
 });
 var isSocketAlive = (socketId) => io.sockets.sockets.has(socketId);
 var isProd = process.env.NODE_ENV === "production";
@@ -1210,6 +1208,15 @@ io.on("connection", (socket) => {
       broadcastRoomState(room);
     }
   });
+  socket.on("set_role_config", (data) => {
+    if (!currentRoomId) return;
+    const room = rooms.get(currentRoomId);
+    if (!room) return;
+    room.includeProdigy = !!data.includeProdigy;
+    const msg = room.includeProdigy ? "\u3010\u5F79\u8077\u8A2D\u5B9A\u3011\u79C0\u624D\u3042\u308A\uFF08\u79C0\u624D1 / \u5B66\u751F3 / \u602A\u76D71 / \u5996\u72D01\uFF09\u306B\u8A2D\u5B9A\u3055\u308C\u307E\u3057\u305F\u3002" : "\u3010\u5F79\u8077\u8A2D\u5B9A\u3011\u79C0\u624D\u306A\u3057\uFF08\u5B66\u751F4 / \u602A\u76D71 / \u5996\u72D01\uFF09\u306B\u8A2D\u5B9A\u3055\u308C\u307E\u3057\u305F\u3002";
+    room.addSystemMessage(msg);
+    broadcastRoomState(room);
+  });
   socket.on("proceed_to_draft", () => {
     if (!currentRoomId) return;
     const room = rooms.get(currentRoomId);
@@ -1291,13 +1298,21 @@ io.on("connection", (socket) => {
         const player = room.getPlayer(currentPlayerId);
         if (player) {
           player.isConnected = false;
-          if (room.phase === "lobby") {
-            room.removePlayer(currentPlayerId);
-            room.cleanDisconnectedInLobby(isSocketAlive);
-          } else {
-            room.ensureActiveHost();
-          }
           broadcastRoomState(room);
+          const pId = currentPlayerId;
+          setTimeout(() => {
+            if (room.phase === "lobby") {
+              const curP = room.getPlayer(pId);
+              if (curP && !curP.isConnected && !curP.isBot) {
+                room.removePlayer(pId);
+                room.cleanDisconnectedInLobby(isSocketAlive);
+                broadcastRoomState(room);
+              }
+            } else {
+              room.ensureActiveHost();
+              broadcastRoomState(room);
+            }
+          }, 15e3);
         }
       }
     }
