@@ -979,17 +979,43 @@ var isSocketAlive = (socketId) => io.sockets.sockets.has(socketId);
 var isProd = process.env.NODE_ENV === "production";
 var PORT = Number(process.env.PORT) || 3e3;
 var rooms = /* @__PURE__ */ new Map();
-var UNIFIED_ROOM_ID = "MANSION";
-function getOrCreateRoom(roomId = UNIFIED_ROOM_ID) {
-  let room = rooms.get(UNIFIED_ROOM_ID);
+function normalizeRoomId(raw) {
+  if (!raw) return "01";
+  const clean = String(raw).replace(/[^0-9]/g, "");
+  if (!clean) return "01";
+  let num = parseInt(clean, 10);
+  if (isNaN(num) || num < 1) num = 1;
+  if (num > 10) num = 10;
+  return num < 10 ? `0${num}` : `${num}`;
+}
+function getOrCreateRoom(rawId) {
+  const normId = normalizeRoomId(rawId);
+  let room = rooms.get(normId);
   if (!room) {
-    room = new GameRoom(UNIFIED_ROOM_ID);
+    room = new GameRoom(normId);
     room.onStateChange = () => {
       broadcastRoomState(room);
+      broadcastRoomsSummary();
     };
-    rooms.set(UNIFIED_ROOM_ID, room);
+    rooms.set(normId, room);
   }
   return room;
+}
+function getRoomsSummary() {
+  const summary = [];
+  for (let i = 1; i <= 10; i++) {
+    const rId = i < 10 ? `0${i}` : `${i}`;
+    const room = rooms.get(rId);
+    summary.push({
+      roomId: rId,
+      playerCount: room ? room.players.size : 0,
+      phase: room ? room.phase : "lobby"
+    });
+  }
+  return summary;
+}
+function broadcastRoomsSummary() {
+  io.emit("rooms_summary", getRoomsSummary());
 }
 function broadcastRoomState(room) {
   const publicState = room.getPublicState();
@@ -1003,6 +1029,9 @@ function broadcastRoomState(room) {
 }
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", activeRooms: rooms.size });
+});
+app.get("/api/rooms", (req, res) => {
+  res.json({ rooms: getRoomsSummary() });
 });
 app.get("/api/download-zip", (req, res) => {
   const zipPath = path.resolve(__dirname, "ichizoku-no-utage.zip");
@@ -1055,6 +1084,10 @@ app.get("/api/characters/list", (req, res) => {
 io.on("connection", (socket) => {
   let currentPlayerId = null;
   let currentRoomId = null;
+  socket.emit("rooms_summary", getRoomsSummary());
+  socket.on("request_rooms_summary", () => {
+    socket.emit("rooms_summary", getRoomsSummary());
+  });
   if (Object.keys(memoryCustomAvatars).length > 0) {
     socket.emit("characters_updated", {
       timestamp: Date.now(),
@@ -1081,17 +1114,26 @@ io.on("connection", (socket) => {
   socket.on(
     "join_room",
     (data) => {
-      const { playerName, playerId } = data;
-      const room = getOrCreateRoom(UNIFIED_ROOM_ID);
+      const targetRoomId = normalizeRoomId(data?.roomId);
+      const room = getOrCreateRoom(targetRoomId);
+      if (currentRoomId && currentRoomId !== room.id) {
+        socket.leave(`room_${currentRoomId}`);
+        const prevRoom = rooms.get(currentRoomId);
+        if (prevRoom && prevRoom.phase === "lobby" && currentPlayerId) {
+          prevRoom.removePlayer(currentPlayerId);
+          prevRoom.ensureActiveHost();
+          broadcastRoomState(prevRoom);
+        }
+      }
       if (room.phase === "lobby") {
         room.cleanDisconnectedInLobby(isSocketAlive);
       }
-      let player = playerId ? room.getPlayer(playerId) : void 0;
+      let player = data.playerId ? room.getPlayer(data.playerId) : void 0;
       if (player) {
         player.socketId = socket.id;
         player.isConnected = true;
-        if (playerName && !player.isBot) {
-          player.name = playerName.trim() || player.name;
+        if (data.playerName && !player.isBot) {
+          player.name = data.playerName.trim() || player.name;
         }
         room.ensureActiveHost();
       } else {
@@ -1101,8 +1143,9 @@ io.on("connection", (socket) => {
           );
           if (!hasConnectedHuman) {
             room.resetForRematch();
+            room.players.clear();
           } else {
-            socket.emit("error_message", "\u30B2\u30FC\u30E0\u304C\u65E2\u306B\u9032\u884C\u4E2D\u306E\u305F\u3081\u53C2\u52A0\u3067\u304D\u307E\u305B\u3093");
+            socket.emit("error_message", `\u90E8\u5C4B #${room.id} \u306F\u30B2\u30FC\u30E0\u304C\u65E2\u306B\u9032\u884C\u4E2D\u306E\u305F\u3081\u53C2\u52A0\u3067\u304D\u307E\u305B\u3093`);
             return;
           }
         }
@@ -1113,12 +1156,12 @@ io.on("connection", (socket) => {
           } else {
             room.cleanDisconnectedInLobby(isSocketAlive);
             if (room.players.size >= 5) {
-              socket.emit("error_message", "\u5B9A\u54E1\uFF085\u540D\uFF09\u306B\u9054\u3057\u3066\u3044\u307E\u3059");
+              socket.emit("error_message", `\u90E8\u5C4B #${room.id} \u306F\u5B9A\u54E1\uFF085\u540D\uFF09\u306B\u9054\u3057\u3066\u3044\u307E\u3059`);
               return;
             }
           }
         }
-        const cleanName = (playerName || "\u5BA2\u4EBA").trim().substring(0, 12);
+        const cleanName = (data.playerName || "\u5BA2\u4EBA").trim().substring(0, 12);
         player = room.addPlayer(cleanName, socket.id, false);
       }
       currentPlayerId = player.id;
@@ -1131,45 +1174,70 @@ io.on("connection", (socket) => {
       });
       socket.emit("chat_history", room.chatMessages);
       broadcastRoomState(room);
+      broadcastRoomsSummary();
     }
   );
-  socket.on("reset_room", () => {
-    const room = getOrCreateRoom(UNIFIED_ROOM_ID);
-    room.resetForRematch();
-    room.cleanDisconnectedInLobby(isSocketAlive);
-    if (currentPlayerId) {
-      const p = room.getPlayer(currentPlayerId);
-      if (p) {
-        for (const other of room.players.values()) other.isHost = false;
-        p.isHost = true;
-      }
-    }
-    room.ensureActiveHost();
-    room.addSystemMessage("\u30B2\u30FC\u30E0\u304C\u30EA\u30BB\u30C3\u30C8\u3055\u308C\u3001\u521D\u671F\u30DE\u30C3\u30C1\u30F3\u30B0\u753B\u9762\u306B\u623B\u308A\u307E\u3057\u305F\u3002");
-    broadcastRoomState(room);
-  });
-  socket.on("start_game", () => {
+  socket.on("leave_room", () => {
     if (!currentRoomId || !currentPlayerId) return;
     const room = rooms.get(currentRoomId);
-    if (!room) return;
-    const player = room.getPlayer(currentPlayerId);
-    if (!player) return;
-    room.ensureActiveHost();
-    if (!player.isHost) {
-      const activeHost = Array.from(room.players.values()).find(
-        (p) => p.isHost && p.isConnected && !p.isBot
-      );
-      if (!activeHost) {
-        player.isHost = true;
+    if (room) {
+      socket.leave(`room_${room.id}`);
+      if (room.phase === "lobby") {
+        room.removePlayer(currentPlayerId);
+        room.ensureActiveHost();
+        broadcastRoomState(room);
+        broadcastRoomsSummary();
       }
     }
-    if (!player.isHost) return;
+    currentRoomId = null;
+    currentPlayerId = null;
+  });
+  socket.on("reset_room", () => {
+    if (!currentRoomId) return;
+    const room = rooms.get(currentRoomId);
+    if (!room) return;
+    room.resetForRematch();
+    room.players.clear();
+    const resetMsg = `\u90E8\u5C4B #${room.id} \u304C\u30EA\u30BB\u30C3\u30C8\u3055\u308C\u307E\u3057\u305F\u3002\u5168\u54E1\u4E00\u5EA6\u9000\u51FA\u3057\u307E\u3057\u305F\u3002\u518D\u5165\u5BA4\u3057\u3066\u304F\u3060\u3055\u3044\u3002`;
+    io.to(`room_${room.id}`).emit("room_reset", {
+      roomId: room.id,
+      message: resetMsg
+    });
+    io.in(`room_${room.id}`).socketsLeave(`room_${room.id}`);
+    currentRoomId = null;
+    currentPlayerId = null;
+    broadcastRoomState(room);
+    broadcastRoomsSummary();
+  });
+  socket.on("start_game", () => {
+    if (!currentRoomId || !currentPlayerId) {
+      socket.emit("error_message", "\u90E8\u5C4B\u306B\u53C2\u52A0\u3057\u3066\u3044\u307E\u305B\u3093");
+      return;
+    }
+    const room = rooms.get(currentRoomId);
+    if (!room) {
+      socket.emit("error_message", "\u90E8\u5C4B\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093");
+      return;
+    }
+    const player = room.getPlayer(currentPlayerId);
+    if (!player) {
+      socket.emit("error_message", "\u30D7\u30EC\u30A4\u30E4\u30FC\u60C5\u5831\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093");
+      return;
+    }
+    room.ensureActiveHost();
     if (room.players.size !== 5) {
-      socket.emit("error_message", "5\u4EBA\u63C3\u3046\u307E\u3067\u30B2\u30FC\u30E0\u3092\u958B\u59CB\u3067\u304D\u307E\u305B\u3093");
+      socket.emit(
+        "error_message",
+        `5\u4EBA\u63C3\u3046\u307E\u3067\u958B\u59CB\u3067\u304D\u307E\u305B\u3093\uFF08\u73FE\u5728 ${room.players.size}/5\u4EBA\uFF09`
+      );
       return;
     }
     if (room.startGame()) {
+      room.addSystemMessage("\u5C4B\u6577\u306E\u5BB4\u304C\u958B\u59CB\u3055\u308C\u307E\u3057\u305F\uFF01");
       broadcastRoomState(room);
+      broadcastRoomsSummary();
+    } else {
+      socket.emit("error_message", "\u30B2\u30FC\u30E0\u3092\u958B\u59CB\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F");
     }
   });
   socket.on("fill_bots", () => {

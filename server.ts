@@ -112,22 +112,50 @@ const isSocketAlive = (socketId: string) => io.sockets.sockets.has(socketId);
 const isProd = process.env.NODE_ENV === 'production';
 const PORT = Number(process.env.PORT) || 3000;
 
-// Rooms store in memory
+// Rooms store in memory (Rooms '01' to '10')
 const rooms = new Map<string, GameRoom>();
 
-// Unified single room ID so all players gather in the same room automatically
-const UNIFIED_ROOM_ID = 'MANSION';
+// Normalize room number: '01' to '10', default '01'
+function normalizeRoomId(raw?: string): string {
+  if (!raw) return '01';
+  const clean = String(raw).replace(/[^0-9]/g, '');
+  if (!clean) return '01';
+  let num = parseInt(clean, 10);
+  if (isNaN(num) || num < 1) num = 1;
+  if (num > 10) num = 10;
+  return num < 10 ? `0${num}` : `${num}`;
+}
 
-function getOrCreateRoom(roomId: string = UNIFIED_ROOM_ID): GameRoom {
-  let room = rooms.get(UNIFIED_ROOM_ID);
+function getOrCreateRoom(rawId?: string): GameRoom {
+  const normId = normalizeRoomId(rawId);
+  let room = rooms.get(normId);
   if (!room) {
-    room = new GameRoom(UNIFIED_ROOM_ID);
+    room = new GameRoom(normId);
     room.onStateChange = () => {
       broadcastRoomState(room!);
+      broadcastRoomsSummary();
     };
-    rooms.set(UNIFIED_ROOM_ID, room);
+    rooms.set(normId, room);
   }
   return room;
+}
+
+function getRoomsSummary() {
+  const summary = [];
+  for (let i = 1; i <= 10; i++) {
+    const rId = i < 10 ? `0${i}` : `${i}`;
+    const room = rooms.get(rId);
+    summary.push({
+      roomId: rId,
+      playerCount: room ? room.players.size : 0,
+      phase: room ? room.phase : 'lobby',
+    });
+  }
+  return summary;
+}
+
+function broadcastRoomsSummary() {
+  io.emit('rooms_summary', getRoomsSummary());
 }
 
 function broadcastRoomState(room: GameRoom) {
@@ -146,6 +174,11 @@ function broadcastRoomState(room: GameRoom) {
 // REST API for room validation or quick health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', activeRooms: rooms.size });
+});
+
+// Rooms status list (01 to 10)
+app.get('/api/rooms', (req, res) => {
+  res.json({ rooms: getRoomsSummary() });
 });
 
 // Download source code ZIP endpoint for exporting to GitHub
@@ -213,6 +246,13 @@ io.on('connection', (socket: Socket) => {
   let currentPlayerId: string | null = null;
   let currentRoomId: string | null = null;
 
+  // Immediately send initial rooms status (01 to 10)
+  socket.emit('rooms_summary', getRoomsSummary());
+
+  socket.on('request_rooms_summary', () => {
+    socket.emit('rooms_summary', getRoomsSummary());
+  });
+
   // Immediately inform new connection of all custom avatars
   if (Object.keys(memoryCustomAvatars).length > 0) {
     socket.emit('characters_updated', {
@@ -245,8 +285,19 @@ io.on('connection', (socket: Socket) => {
   socket.on(
     'join_room',
     (data: { roomId?: string; playerName: string; playerId?: string }) => {
-      const { playerName, playerId } = data;
-      const room = getOrCreateRoom(UNIFIED_ROOM_ID);
+      const targetRoomId = normalizeRoomId(data?.roomId);
+      const room = getOrCreateRoom(targetRoomId);
+
+      // Leave previous room if changing room
+      if (currentRoomId && currentRoomId !== room.id) {
+        socket.leave(`room_${currentRoomId}`);
+        const prevRoom = rooms.get(currentRoomId);
+        if (prevRoom && prevRoom.phase === 'lobby' && currentPlayerId) {
+          prevRoom.removePlayer(currentPlayerId);
+          prevRoom.ensureActiveHost();
+          broadcastRoomState(prevRoom);
+        }
+      }
 
       // In lobby phase, clean up stale disconnected ghost players first
       if (room.phase === 'lobby') {
@@ -254,14 +305,14 @@ io.on('connection', (socket: Socket) => {
       }
 
       // Reconnect check
-      let player = playerId ? room.getPlayer(playerId) : undefined;
+      let player = data.playerId ? room.getPlayer(data.playerId) : undefined;
 
       if (player) {
         // Reconnection successful
         player.socketId = socket.id;
         player.isConnected = true;
-        if (playerName && !player.isBot) {
-          player.name = playerName.trim() || player.name;
+        if (data.playerName && !player.isBot) {
+          player.name = data.playerName.trim() || player.name;
         }
         room.ensureActiveHost();
       } else {
@@ -273,8 +324,9 @@ io.on('connection', (socket: Socket) => {
           );
           if (!hasConnectedHuman) {
             room.resetForRematch();
+            room.players.clear();
           } else {
-            socket.emit('error_message', 'ゲームが既に進行中のため参加できません');
+            socket.emit('error_message', `部屋 #${room.id} はゲームが既に進行中のため参加できません`);
             return;
           }
         }
@@ -288,13 +340,13 @@ io.on('connection', (socket: Socket) => {
             // Also check if any inactive humans can be cleaned
             room.cleanDisconnectedInLobby(isSocketAlive);
             if (room.players.size >= 5) {
-              socket.emit('error_message', '定員（5名）に達しています');
+              socket.emit('error_message', `部屋 #${room.id} は定員（5名）に達しています`);
               return;
             }
           }
         }
 
-        const cleanName = (playerName || '客人').trim().substring(0, 12);
+        const cleanName = (data.playerName || '客人').trim().substring(0, 12);
         player = room.addPlayer(cleanName, socket.id, false);
       }
 
@@ -313,50 +365,83 @@ io.on('connection', (socket: Socket) => {
       socket.emit('chat_history', room.chatMessages);
 
       broadcastRoomState(room);
+      broadcastRoomsSummary();
     }
   );
 
-  socket.on('reset_room', () => {
-    const room = getOrCreateRoom(UNIFIED_ROOM_ID);
-    room.resetForRematch();
-    room.cleanDisconnectedInLobby(isSocketAlive);
-    if (currentPlayerId) {
-      const p = room.getPlayer(currentPlayerId);
-      if (p) {
-        for (const other of room.players.values()) other.isHost = false;
-        p.isHost = true;
+  socket.on('leave_room', () => {
+    if (!currentRoomId || !currentPlayerId) return;
+    const room = rooms.get(currentRoomId);
+    if (room) {
+      socket.leave(`room_${room.id}`);
+      if (room.phase === 'lobby') {
+        room.removePlayer(currentPlayerId);
+        room.ensureActiveHost();
+        broadcastRoomState(room);
+        broadcastRoomsSummary();
       }
     }
-    room.ensureActiveHost();
-    room.addSystemMessage('ゲームがリセットされ、初期マッチング画面に戻りました。');
+    currentRoomId = null;
+    currentPlayerId = null;
+  });
+
+  socket.on('reset_room', () => {
+    if (!currentRoomId) return;
+    const room = rooms.get(currentRoomId);
+    if (!room) return;
+
+    // Reset game state and clear all players so everyone exits and re-enters
+    room.resetForRematch();
+    room.players.clear();
+
+    const resetMsg = `部屋 #${room.id} がリセットされました。全員一度退出しました。再入室してください。`;
+    io.to(`room_${room.id}`).emit('room_reset', {
+      roomId: room.id,
+      message: resetMsg,
+    });
+
+    // Make all connected clients in this room leave the socket room
+    io.in(`room_${room.id}`).socketsLeave(`room_${room.id}`);
+
+    currentRoomId = null;
+    currentPlayerId = null;
+
     broadcastRoomState(room);
+    broadcastRoomsSummary();
   });
 
   socket.on('start_game', () => {
-    if (!currentRoomId || !currentPlayerId) return;
+    if (!currentRoomId || !currentPlayerId) {
+      socket.emit('error_message', '部屋に参加していません');
+      return;
+    }
     const room = rooms.get(currentRoomId);
-    if (!room) return;
+    if (!room) {
+      socket.emit('error_message', '部屋が見つかりません');
+      return;
+    }
     const player = room.getPlayer(currentPlayerId);
-    if (!player) return;
+    if (!player) {
+      socket.emit('error_message', 'プレイヤー情報が見つかりません');
+      return;
+    }
 
     room.ensureActiveHost();
-    if (!player.isHost) {
-      const activeHost = Array.from(room.players.values()).find(
-        (p) => p.isHost && p.isConnected && !p.isBot
-      );
-      if (!activeHost) {
-        player.isHost = true;
-      }
-    }
-    if (!player.isHost) return;
 
     if (room.players.size !== 5) {
-      socket.emit('error_message', '5人揃うまでゲームを開始できません');
+      socket.emit(
+        'error_message',
+        `5人揃うまで開始できません（現在 ${room.players.size}/5人）`
+      );
       return;
     }
 
     if (room.startGame()) {
+      room.addSystemMessage('屋敷の宴が開始されました！');
       broadcastRoomState(room);
+      broadcastRoomsSummary();
+    } else {
+      socket.emit('error_message', 'ゲームを開始できませんでした');
     }
   });
 
