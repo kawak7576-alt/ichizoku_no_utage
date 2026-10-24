@@ -620,6 +620,20 @@ io.on('connection', (socket: Socket) => {
   });
 });
 
+// Explicit route for OGP image to ensure CORS header for Discord / Twitter / LINE bots
+app.get('/ogp_cover.jpg', (req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  const distImg = path.resolve(__dirname, 'dist', 'ogp_cover.jpg');
+  const publicImg = path.resolve(__dirname, 'public', 'ogp_cover.jpg');
+  if (fs.existsSync(distImg)) {
+    return res.sendFile(distImg);
+  } else if (fs.existsSync(publicImg)) {
+    return res.sendFile(publicImg);
+  }
+  next();
+});
+
 // Setup Vite or static serving
 if (!isProd) {
   const { createServer: createViteServer } = await import('vite');
@@ -629,9 +643,36 @@ if (!isProd) {
   });
   app.use(vite.middlewares);
 } else {
-  app.use(express.static(path.resolve(__dirname, 'dist')));
+  const distDir = path.resolve(__dirname, 'dist');
+  app.use(
+    express.static(distDir, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('ogp_cover.jpg')) {
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+        }
+      },
+    })
+  );
   app.get('*', (req, res) => {
-    res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
+    const indexPath = path.resolve(distDir, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      let html = fs.readFileSync(indexPath, 'utf-8');
+      const proto =
+        (req.headers['x-forwarded-proto'] as string) ||
+        (req.secure ? 'https' : 'http');
+      const host = req.get('host') || 'ichizoku-no-utage.onrender.com';
+      if (!host.includes('localhost')) {
+        const baseUrl = `${proto}://${host}`;
+        html = html
+          .replace(/https:\/\/ichizoku-no-utage\.onrender\.com\//g, `${baseUrl}/`)
+          .replace(/https:\/\/ichizoku-no-utage\.onrender\.com/g, baseUrl);
+      }
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(html);
+    } else {
+      res.sendFile(indexPath);
+    }
   });
 }
 
