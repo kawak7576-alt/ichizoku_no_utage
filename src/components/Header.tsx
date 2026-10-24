@@ -17,6 +17,7 @@ interface HeaderProps {
   isConnected: boolean;
   playerCount: number;
   isHost: boolean;
+  roomId?: string;
   onOpenRules: () => void;
   onOpenResetConfirm: () => void;
   onOpenImageSheet?: () => void;
@@ -28,6 +29,7 @@ export function Header({
   isConnected,
   playerCount,
   isHost,
+  roomId = '01',
   onOpenRules,
   onOpenResetConfirm,
   onOpenImageSheet,
@@ -39,16 +41,16 @@ export function Header({
   const customThiefAvatar = avatars['phantom_thief'];
 
   const handleCopy = async () => {
-    const cleanUrl = window.location.origin + window.location.pathname;
-    const shareTitle = '一族の宴 ― 消えた家宝と怪盗と ―';
-    const shareText = '5人オンライン対戦型・正体隠匿×ワードウルフ推理ゲーム【一族の宴】の屋敷へ招待されました！';
+    const cleanUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
+    const shareTitle = `一族の宴 ― 消えた家宝と怪盗と ―【部屋 #${roomId}】`;
+    const shareText = `5人オンライン対戦型・正体隠匿×ワードウルフ推理ゲーム【一族の宴】の部屋 #${roomId} へ招待されました！`;
 
     // 1. Mobile native share API (LINE, Twitter, Messages)
     if (navigator.share) {
       try {
         await navigator.share({
           title: shareTitle,
-          text: `${shareTitle}\n${shareText}\n`,
+          text: `${shareTitle}\n${shareText}\n部屋番号: #${roomId}\n`,
           url: cleanUrl,
         });
         setCopied(true);
@@ -61,7 +63,7 @@ export function Header({
 
     // 2. Clipboard copy with title and explanation
     try {
-      const fullCopy = `【${shareTitle}】\n${shareText}\n招待URL: ${cleanUrl}`;
+      const fullCopy = `【${shareTitle}】\n${shareText}\n部屋番号: #${roomId}\n招待URL: ${cleanUrl}`;
       await navigator.clipboard.writeText(fullCopy);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);

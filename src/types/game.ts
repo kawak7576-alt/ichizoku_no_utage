@@ -43,6 +43,12 @@ export type GamePhase =
   | 'salvation'
   | 'result';
 
+export interface RoomSummary {
+  roomId: string;
+  playerCount: number;
+  phase: string;
+}
+
 export interface PlayerPublic {
   id: string;
   name: string;

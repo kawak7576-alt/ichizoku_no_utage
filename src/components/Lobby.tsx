@@ -1,31 +1,35 @@
 import React, { useState } from 'react';
 import {
   Users,
-  Crown,
   Play,
   Bot,
-  UserPlus,
   Share2,
   Check,
   Sparkles,
   HelpCircle,
   Download,
-  ShieldAlert,
   RotateCcw,
   Sliders,
+  Hash,
+  Shuffle,
+  DoorOpen,
 } from 'lucide-react';
-import { GameStatePublic, PlayerPublic } from '../types/game.ts';
-import { CHARACTERS, SIBLING_CHARACTERS } from '../data/characters.ts';
+import { GameStatePublic, PlayerPublic, RoomSummary } from '../types/game.ts';
+import { SIBLING_CHARACTERS } from '../data/characters.ts';
 import { CharacterAvatar } from './CharacterAvatar.tsx';
-import { OrnateCorner, OrnateDivider } from './OrnateFrame.tsx';
+import { OrnateCorner } from './OrnateFrame.tsx';
 import { PhantomThiefIcon } from './PhantomThiefIcon.tsx';
 import { useCharacterAvatars } from '../hooks/useCharacterAvatars.ts';
+import { RoomSelectModal } from './RoomSelectModal.tsx';
 
 interface LobbyProps {
   gameState: GameStatePublic | null;
   currentUserId: string;
   isHost: boolean;
-  onJoinRoom: (name: string) => void;
+  roomId: string;
+  roomsSummary?: RoomSummary[];
+  onJoinRoom: (name: string, targetRoomId?: string) => void;
+  onChangeRoom?: (newRoomId: string) => void;
   onStartGame: () => void;
   onFillBots: () => void;
   onRemoveBots: () => void;
@@ -40,40 +44,62 @@ export function Lobby({
   gameState,
   currentUserId,
   isHost,
+  roomId,
+  roomsSummary = [],
   onJoinRoom,
+  onChangeRoom,
   onStartGame,
   onFillBots,
   onRemoveBots,
   onKickPlayer,
   onOpenRules,
-  onOpenImageSheet,
   onResetRoom,
   onOpenRoleSettings,
 }: LobbyProps) {
   const { avatars } = useCharacterAvatars();
   const customThiefAvatar = avatars['phantom_thief'];
+
   const [inputName, setInputName] = useState(() => {
-    return sessionStorage.getItem('mansion_player_name') || '探偵';
+    return (
+      sessionStorage.getItem('mansion_player_name') ||
+      localStorage.getItem('mansion_player_name') ||
+      '探偵'
+    );
   });
+  const [selectedRoomId, setSelectedRoomId] = useState<string>(roomId || '01');
+  const [roomModalOpen, setRoomModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // 4-1. Title Screen (when player has not joined yet or reloaded)
-  if (!gameState) {
-    const handleJoinSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!inputName.trim()) return;
-      onJoinRoom(inputName.trim());
-    };
+  // 1. If not yet joined to room (no current player id or not in players list)
+  const isJoined =
+    !!currentUserId &&
+    !!gameState &&
+    gameState.players.some((p) => p.id === currentUserId);
 
-    const hasSavedId = !!sessionStorage.getItem('mansion_player_id');
+  const handleJoinSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanName = inputName.trim() || '探偵';
+    sessionStorage.setItem('mansion_player_name', cleanName);
+    localStorage.setItem('mansion_player_name', cleanName);
+    onJoinRoom(cleanName, selectedRoomId);
+  };
+
+  const handleRandomRoom = () => {
+    const rand = Math.floor(Math.random() * 10) + 1;
+    const formatted = rand < 10 ? `0${rand}` : `${rand}`;
+    setSelectedRoomId(formatted);
+  };
+
+  const allRooms = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10'];
+
+  // If user has not joined yet, show the Join Screen
+  if (!isJoined || !gameState) {
+    const activeRoomsWithPlayers = roomsSummary.filter((r) => r.playerCount > 0);
 
     return (
-      <div className="max-w-md mx-auto my-4 sm:my-8 px-4 py-4 animate-fade-in">
-        <div className="relative dark-panel p-6 sm:p-8 text-center space-y-4 border-amber-600/70 shadow-2xl overflow-hidden backdrop-blur-md">
-          {/* Inner hairline border */}
-          <div className="absolute inset-[4px] rounded-xl border border-amber-500/25 pointer-events-none" />
-
-          {/* 4 Victorian corner flourishes */}
+      <div className="max-w-md mx-auto my-auto px-3 sm:px-4 py-3 sm:py-6 animate-fade-in w-full">
+        <div className="relative dark-panel p-5 sm:p-7 text-center overflow-hidden space-y-4 border-amber-600/70 shadow-2xl">
+          {/* Ornate corners */}
           <div className="absolute top-1.5 left-1.5 pointer-events-none">
             <OrnateCorner position="top-left" className="w-5 h-5 text-amber-500/80" />
           </div>
@@ -88,11 +114,11 @@ export function Lobby({
           </div>
 
           {/* Crest / Emblem: 怪盗のアイコン */}
-          <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-tr from-purple-950 via-stone-950 to-amber-900 border-2 border-amber-500/60 flex items-center justify-center shadow-xl overflow-hidden">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto rounded-2xl bg-gradient-to-tr from-purple-950 via-stone-950 to-amber-900 border-2 border-amber-500/60 flex items-center justify-center shadow-xl overflow-hidden">
             {customThiefAvatar ? (
               <img src={customThiefAvatar} alt="怪盗" className="w-full h-full object-cover" />
             ) : (
-              <PhantomThiefIcon className="w-13 h-13 text-amber-300" />
+              <PhantomThiefIcon className="w-12 h-12 text-amber-300" />
             )}
           </div>
 
@@ -104,7 +130,7 @@ export function Lobby({
             <p className="text-xs text-amber-400/90 font-serif tracking-wider mt-1">
               ― 消えた家宝と怪盗と ―
             </p>
-            <p className="text-xs text-stone-400 mt-3 leading-relaxed max-w-xs mx-auto">
+            <p className="text-xs text-stone-400 mt-2.5 leading-relaxed max-w-xs mx-auto font-serif">
               正体隠匿 × ワードウルフ推理ゲーム
               <br />
               一族の誰かに変装した怪盗、そして妖狐の化かし合いを見破れ。
@@ -112,9 +138,10 @@ export function Lobby({
           </div>
 
           {/* Join Form */}
-          <form onSubmit={handleJoinSubmit} className="space-y-4 pt-2">
-            <div className="text-left">
-              <label className="block text-xs font-serif font-bold text-amber-300 mb-1.5">
+          <form onSubmit={handleJoinSubmit} className="space-y-4 pt-1">
+            {/* 1. Name Input */}
+            <div className="text-left space-y-1">
+              <label className="block text-xs font-serif font-bold text-amber-300">
                 あなたの名前
               </label>
               <input
@@ -123,36 +150,127 @@ export function Lobby({
                 onChange={(e) => setInputName(e.target.value)}
                 maxLength={12}
                 placeholder="例: 名探偵アリス"
-                className="w-full px-4 py-3 bg-stone-950 border border-amber-900/60 focus:border-amber-400 rounded-xl text-sm text-stone-100 placeholder-stone-600 focus:outline-none transition min-h-[48px]"
+                className="w-full px-4 py-2.5 bg-stone-950 border border-amber-900/60 focus:border-amber-400 rounded-xl text-sm text-stone-100 placeholder-stone-600 focus:outline-none transition min-h-[44px]"
                 required
               />
             </div>
 
+            {/* 2. Room Selection Box (01 to 10, default 01) */}
+            <div className="text-left p-3.5 rounded-xl bg-stone-950/80 border border-amber-800/60 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-serif font-bold text-amber-300 flex items-center gap-1.5">
+                  <Hash className="w-3.5 h-3.5 text-amber-400" />
+                  <span>部屋番号の選択（01〜10）</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={handleRandomRoom}
+                  className="text-[10px] text-amber-400/80 hover:text-amber-200 flex items-center gap-1 font-serif underline cursor-pointer"
+                >
+                  <Shuffle className="w-3 h-3" />
+                  <span>ランダム</span>
+                </button>
+              </div>
+
+              {/* Number display / input */}
+              <div className="flex items-center justify-between gap-2 bg-stone-900/90 p-2 rounded-lg border border-amber-600/40">
+                <span className="text-xs text-stone-400 font-serif">選択中の部屋：</span>
+                <div className="flex items-center gap-1">
+                  <span className="font-mono text-lg font-bold text-amber-400">#</span>
+                  <input
+                    type="text"
+                    value={selectedRoomId}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^0-9]/g, '');
+                      if (val.length <= 2) {
+                        setSelectedRoomId(val);
+                      }
+                    }}
+                    onBlur={() => {
+                      let num = parseInt(selectedRoomId, 10);
+                      if (isNaN(num) || num < 1) num = 1;
+                      if (num > 10) num = 10;
+                      setSelectedRoomId(num < 10 ? `0${num}` : `${num}`);
+                    }}
+                    maxLength={2}
+                    className="w-10 bg-stone-950 border border-amber-600/60 rounded text-center text-base font-mono font-black text-amber-200 focus:outline-none py-0.5"
+                  />
+                  <span className="text-[11px] text-stone-400 ml-1">号室</span>
+                </div>
+              </div>
+
+              {/* Quick Select Buttons 01-10 */}
+              <div className="space-y-1">
+                <div className="text-[10px] text-stone-400 font-serif">
+                  番号をタップして選択：
+                </div>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {allRooms.map((r) => {
+                    const summary = roomsSummary.find((s) => s.roomId === r);
+                    const count = summary ? summary.playerCount : 0;
+                    const isSelected = selectedRoomId === r;
+                    return (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => setSelectedRoomId(r)}
+                        className={`py-1.5 px-1 rounded-lg font-mono text-xs font-bold transition flex flex-col items-center justify-center gap-0.5 border cursor-pointer ${
+                          isSelected
+                            ? 'bg-amber-400 text-stone-950 border-amber-300 shadow font-black'
+                            : 'bg-stone-900 text-stone-300 border-stone-800 hover:border-amber-600/60'
+                        }`}
+                      >
+                        <span>#{r}</span>
+                        <span
+                          className={`text-[9px] ${
+                            isSelected
+                              ? 'text-stone-950'
+                              : count > 0
+                              ? 'text-amber-400 font-bold'
+                              : 'text-stone-600'
+                          }`}
+                        >
+                          {count > 0 ? `${count}人` : '空'}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Active Rooms hint */}
+              {activeRoomsWithPlayers.length > 0 && (
+                <div className="pt-1 text-[11px] text-stone-400 flex items-center gap-1.5 flex-wrap">
+                  <span className="text-amber-300/90 font-serif">👥 待機中の部屋:</span>
+                  {activeRoomsWithPlayers.map((r) => (
+                    <button
+                      key={r.roomId}
+                      type="button"
+                      onClick={() => setSelectedRoomId(r.roomId)}
+                      className="px-1.5 py-0.5 rounded bg-amber-950/70 border border-amber-600/60 text-amber-300 font-mono text-[10px] hover:border-amber-400 cursor-pointer"
+                    >
+                      #{r.roomId}（{r.playerCount}人）
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Submit Button */}
             <button
               type="submit"
-              className="w-full gold-btn py-3.5 rounded-xl font-serif text-sm tracking-widest flex items-center justify-center gap-2 cursor-pointer transition active:scale-[0.98]"
+              className="w-full gold-btn py-3.5 rounded-xl font-serif text-sm tracking-widest flex items-center justify-center gap-2 cursor-pointer transition active:scale-[0.98] shadow-lg"
             >
-              <span>{hasSavedId ? 'ゲームに参加・復帰する' : 'ゲームに参加する'}</span>
+              <DoorOpen className="w-4 h-4 stroke-[2.5]" />
+              <span>部屋 #{selectedRoomId} に参加する</span>
             </button>
           </form>
 
-          {/* Image Sheet Action */}
-          {onOpenImageSheet && (
-            <button
-              type="button"
-              onClick={onOpenImageSheet}
-              className="w-full py-2.5 px-3 rounded-xl border border-amber-600/70 bg-amber-950/40 hover:bg-amber-900/60 text-amber-200 text-xs font-serif font-bold transition flex items-center justify-center gap-1.5 shadow-sm"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>🖼️ キャラクター画像シート（image.png）を適用</span>
-            </button>
-          )}
-
           {/* Footer links */}
-          <div className="pt-4 border-t border-stone-800/80 flex items-center justify-between text-xs text-stone-400">
+          <div className="pt-3 border-t border-stone-800/80 flex items-center justify-between text-xs text-stone-400">
             <button
               onClick={onOpenRules}
-              className="text-amber-400 hover:text-amber-300 underline underline-offset-4 flex items-center gap-1"
+              className="text-amber-400 hover:text-amber-300 underline underline-offset-4 flex items-center gap-1 cursor-pointer"
             >
               <HelpCircle className="w-3.5 h-3.5" />
               掟と役職一覧
@@ -171,23 +289,53 @@ export function Lobby({
     );
   }
 
-  // 4-2. Matching & Waiting Screen
+  // 2. Waiting Room (Matching screen)
   const players = gameState.players;
   const isReadyToStart = players.length === 5;
   const hasBots = players.some((p) => p.isBot);
-  const connectedHumans = players.filter((p) => p.isConnected && !p.isBot);
-  const hasDisconnectedPlayers = players.some((p) => !p.isConnected);
-  const effectiveHost = isHost || connectedHumans.length <= 1;
 
-  const handleShare = () => {
-    const cleanUrl = window.location.origin + window.location.pathname;
-    navigator.clipboard.writeText(cleanUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleShare = async () => {
+    const cleanUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
+    const shareTitle = `一族の宴 ― 消えた家宝と怪盗と ―【部屋 #${roomId}】`;
+    const shareText = `5人オンライン対戦型・正体隠匿×ワードウルフ推理ゲーム【一族の宴】の部屋 #${roomId} へ招待されました！`;
+    const fullCopy = `【${shareTitle}】\n${shareText}\n部屋番号: #${roomId}\n招待URL: ${cleanUrl}`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: shareTitle,
+          text: `${shareText}\n部屋番号: #${roomId}`,
+          url: cleanUrl,
+        });
+      } else {
+        await navigator.clipboard.writeText(fullCopy);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      await navigator.clipboard.writeText(fullCopy);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   return (
     <div className="max-w-2xl mx-auto my-1.5 sm:my-4 px-2.5 sm:px-4 space-y-2.5 sm:space-y-4 animate-fade-in pb-4 sm:pb-8">
+      {/* Room Selection Modal */}
+      <RoomSelectModal
+        isOpen={roomModalOpen}
+        onClose={() => setRoomModalOpen(false)}
+        currentRoomId={roomId}
+        roomsSummary={roomsSummary}
+        onSelectRoom={(newRoomId) => {
+          if (onChangeRoom) {
+            onChangeRoom(newRoomId);
+          } else {
+            onJoinRoom(inputName, newRoomId);
+          }
+        }}
+      />
+
       {/* Waiting Room Header Banner */}
       <div className="relative dark-panel p-3 sm:p-5 shadow-2xl overflow-hidden border-amber-600/60">
         <div className="absolute inset-[3px] rounded-xl border border-amber-500/20 pointer-events-none" />
@@ -206,10 +354,20 @@ export function Lobby({
 
         <div className="relative z-10 flex items-center justify-between gap-2 pb-2.5 sm:pb-3 border-b border-stone-800/80">
           <div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span className="px-1.5 py-0.5 bg-stone-950 border border-amber-500/70 text-amber-300 font-serif text-[10px] sm:text-[11px] font-bold rounded">
                 マッチング待機中
               </span>
+              <button
+                type="button"
+                onClick={() => setRoomModalOpen(true)}
+                title="部屋番号を変更する"
+                className="px-2 py-0.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/60 text-amber-300 font-mono text-[11px] font-bold rounded-lg flex items-center gap-1 transition cursor-pointer"
+              >
+                <span>部屋</span>
+                <span className="text-amber-200 font-black">#{roomId}</span>
+                <span className="text-[10px] text-amber-400/80 underline font-serif ml-0.5">変更</span>
+              </button>
               <span className="text-[11px] sm:text-xs text-stone-400">5人固定の宴</span>
             </div>
             <h2 className="text-base sm:text-lg font-serif font-black tracking-wider text-amber-100 mt-0.5">
@@ -232,7 +390,8 @@ export function Lobby({
 
             <button
               onClick={handleShare}
-              className="flex items-center gap-1 px-2.5 py-1.5 sm:px-3 sm:py-2 bg-stone-950 hover:bg-stone-900 text-amber-300 text-xs font-serif font-bold rounded-xl border border-amber-600/70 transition active:scale-95 min-h-[38px] sm:min-h-[44px]"
+              title={`部屋 #${roomId} の招待URLを送信・コピー`}
+              className="flex items-center gap-1 px-2.5 py-1.5 sm:px-3 sm:py-2 bg-stone-950 hover:bg-stone-900 text-amber-300 text-xs font-serif font-bold rounded-xl border border-amber-600/70 transition active:scale-95 min-h-[38px] sm:min-h-[44px] cursor-pointer"
             >
               {copied ? (
                 <>
@@ -301,8 +460,9 @@ export function Lobby({
                       <div className="font-serif font-bold text-stone-100 text-[10px] sm:text-xs truncate">
                         {player.name}
                       </div>
-                      <div className="text-[9px] text-amber-400/80 mt-0.5 truncate">
-                        {isCurrent ? '（あなた）' : player.isBot ? 'Bot' : player.isConnected ? '着席済' : '切断'}
+                      <div className="text-[9px] text-amber-400/80 mt-0.5 truncate flex items-center justify-center gap-0.5">
+                        {player.isHost && <span title="ホスト">👑</span>}
+                        <span>{isCurrent ? '（あなた）' : player.isBot ? 'Bot' : player.isConnected ? '着席済' : '切断'}</span>
                       </div>
                     </div>
                   </div>
@@ -331,7 +491,7 @@ export function Lobby({
 
         {/* Action Panel for Controls */}
         <div className="space-y-1.5 sm:space-y-2 pt-0.5 sm:pt-1">
-          {/* Bot & Reset Toolbar (always available so user is never stuck) */}
+          {/* Bot & Reset Toolbar */}
           <div className="p-1.5 sm:p-2.5 bg-stone-950/80 rounded-xl border border-stone-800/80 flex flex-wrap items-center justify-between gap-1.5">
             <div className="text-[11px] text-stone-400 flex items-center gap-1.5 flex-wrap">
               <span className="font-serif font-bold text-stone-300">
@@ -362,7 +522,7 @@ export function Lobby({
               {onResetRoom && (
                 <button
                   onClick={onResetRoom}
-                  title="部屋の切断プレイヤーやBotをリセットして1人から再開"
+                  title="部屋をリセットして全員退出・名前入力画面に戻る"
                   className="px-2 py-1.5 bg-stone-900 hover:bg-stone-800 border border-stone-700 text-stone-400 hover:text-amber-200 text-xs rounded-lg transition cursor-pointer min-h-[36px] flex items-center gap-1"
                 >
                   <RotateCcw className="w-3 h-3 text-amber-400" />
@@ -378,7 +538,7 @@ export function Lobby({
             disabled={!isReadyToStart}
             className={`w-full py-2.5 sm:py-3.5 rounded-xl font-serif font-black text-xs sm:text-sm tracking-widest flex items-center justify-center gap-2 transition min-h-[42px] sm:min-h-[46px] ${
               isReadyToStart
-                ? 'gold-btn cursor-pointer'
+                ? 'gold-btn cursor-pointer shadow-lg'
                 : 'bg-stone-900 text-stone-600 border border-stone-800 cursor-not-allowed'
             }`}
           >
@@ -386,7 +546,7 @@ export function Lobby({
             <span>
               {isReadyToStart
                 ? '宴を開始する（ゲーム開始）'
-                : '5人揃うまで開始できません（上の「Botで5人にする」で即開始可能）'}
+                : `5人揃うまで開始できません（現在 ${players.length}/5人・「Botで5人にする」で即開始可能）`}
             </span>
           </button>
         </div>
@@ -413,14 +573,6 @@ export function Lobby({
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
             <span>屋敷の一族（６人の兄弟姉妹から5人が配役・１人は療養室へ）</span>
           </h3>
-          {onOpenImageSheet && (
-            <button
-              onClick={onOpenImageSheet}
-              className="text-[10px] sm:text-[11px] text-amber-300 hover:text-amber-200 underline flex items-center gap-1 cursor-pointer"
-            >
-              <span>🖼️ 画像シート適用</span>
-            </button>
-          )}
         </div>
         <div className="relative z-10 grid grid-cols-3 sm:grid-cols-6 gap-1.5 sm:gap-2">
           {SIBLING_CHARACTERS.map((char) => (

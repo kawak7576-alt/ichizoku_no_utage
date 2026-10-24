@@ -5,6 +5,7 @@ import {
   GameStatePublic,
   PlayerPrivate,
   Role,
+  RoomSummary,
 } from '../types/game.ts';
 
 export function useGameSocket() {
@@ -13,14 +14,24 @@ export function useGameSocket() {
   const [gameState, setGameState] = useState<GameStatePublic | null>(null);
   const [privateState, setPrivateState] = useState<PlayerPrivate>({});
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [playerId, setPlayerId] = useState<string>(() => {
-    return (
-      sessionStorage.getItem('mansion_player_id') ||
-      localStorage.getItem('mansion_player_id') ||
-      ''
-    );
+  // Only remember playerId in state if session says so, but default to empty so landing screen is shown
+  const [playerId, setPlayerId] = useState<string>('');
+  const [roomId, setRoomId] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlRoom = params.get('room');
+      if (urlRoom) {
+        const clean = urlRoom.replace(/[^0-9]/g, '');
+        const num = parseInt(clean, 10);
+        if (!isNaN(num) && num >= 1 && num <= 10) {
+          return num < 10 ? `0${num}` : `${num}`;
+        }
+      }
+      return sessionStorage.getItem('mansion_room_id') || '01';
+    }
+    return '01';
   });
-  const [roomId, setRoomId] = useState<string>('MANSION');
+  const [roomsSummary, setRoomsSummary] = useState<RoomSummary[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -43,19 +54,8 @@ export function useGameSocket() {
         disconnectTimer = null;
       }
       setIsConnected(true);
-      // Auto-reconnect if we have playerId & playerName
-      const savedPlayer =
-        sessionStorage.getItem('mansion_player_id') ||
-        localStorage.getItem('mansion_player_id');
-      const savedName =
-        sessionStorage.getItem('mansion_player_name') ||
-        localStorage.getItem('mansion_player_name');
-      if (savedPlayer) {
-        socket.emit('join_room', {
-          playerName: savedName || '客人',
-          playerId: savedPlayer,
-        });
-      }
+
+      // Do NOT auto-join on connect! Keep the user on the join screen so they can choose name & room.
 
       // Auto-sync custom character avatars to server (handles server restarts and Render spin-ups)
       const localAvatars: Record<string, string> = {};
@@ -86,6 +86,9 @@ export function useGameSocket() {
       } else {
         socket.emit('request_avatars');
       }
+
+      // Request real-time room list
+      socket.emit('request_rooms_summary');
     });
 
     socket.on('disconnect', () => {
@@ -98,17 +101,34 @@ export function useGameSocket() {
       }
     });
 
+    socket.on('rooms_summary', (summary: RoomSummary[]) => {
+      if (Array.isArray(summary)) {
+        setRoomsSummary(summary);
+      }
+    });
+
     socket.on('room_joined', (data: { roomId: string; playerId: string; isHost: boolean }) => {
       setRoomId(data.roomId);
       setPlayerId(data.playerId);
       sessionStorage.setItem('mansion_room_id', data.roomId);
       sessionStorage.setItem('mansion_player_id', data.playerId);
-      localStorage.setItem('mansion_player_id', data.playerId);
 
-      // Clean URL if any query param was present
+      // Clean URL if room query param was present
       if (window.location.search) {
         window.history.replaceState({}, '', window.location.pathname);
       }
+    });
+
+    socket.on('room_reset', (data: { roomId: string; message: string }) => {
+      // When the room is reset by anyone, all players in the room are kicked out to join screen
+      setPlayerId('');
+      setGameState(null);
+      setPrivateState({});
+      sessionStorage.removeItem('mansion_player_id');
+      localStorage.removeItem('mansion_player_id');
+      setErrorMessage(data?.message || '部屋がリセットされました。再入室してください。');
+      setTimeout(() => setErrorMessage(null), 6000);
+      socket.emit('request_rooms_summary');
     });
 
     socket.on('game_state', (state: GameStatePublic) => {
@@ -172,17 +192,31 @@ export function useGameSocket() {
   }, []);
 
   const joinRoom = useCallback(
-    (playerName: string) => {
+    (playerName: string, targetRoomId?: string) => {
       if (!socketRef.current) return;
       const cleanName = playerName.trim() || '客人';
+      const cleanRoom = targetRoomId || roomId || '01';
       sessionStorage.setItem('mansion_player_name', cleanName);
+      localStorage.setItem('mansion_player_name', cleanName);
+      setRoomId(cleanRoom);
       socketRef.current.emit('join_room', {
         playerName: cleanName,
-        playerId: playerId || undefined,
+        roomId: cleanRoom,
       });
     },
-    [playerId]
+    [roomId]
   );
+
+  const leaveRoom = useCallback(() => {
+    if (!socketRef.current) return;
+    socketRef.current.emit('leave_room');
+    setPlayerId('');
+    setGameState(null);
+    setPrivateState({});
+    sessionStorage.removeItem('mansion_player_id');
+    localStorage.removeItem('mansion_player_id');
+    socketRef.current.emit('request_rooms_summary');
+  }, []);
 
   const startGame = useCallback(() => {
     socketRef.current?.emit('start_game');
@@ -244,6 +278,10 @@ export function useGameSocket() {
     socketRef.current?.emit('set_role_config', { includeProdigy });
   }, []);
 
+  const refreshRooms = useCallback(() => {
+    socketRef.current?.emit('request_rooms_summary');
+  }, []);
+
   const currentPlayer = gameState?.players.find((p) => p.id === playerId);
   const isHost = !!currentPlayer?.isHost;
 
@@ -254,10 +292,13 @@ export function useGameSocket() {
     chatMessages,
     playerId,
     roomId,
+    setRoomId,
+    roomsSummary,
     currentPlayer,
     isHost,
     errorMessage,
     joinRoom,
+    leaveRoom,
     startGame,
     fillBots,
     removeBots,
@@ -273,5 +314,6 @@ export function useGameSocket() {
     sendChat,
     clearError,
     setRoleConfig,
+    refreshRooms,
   };
 }

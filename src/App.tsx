@@ -34,6 +34,8 @@ export default function App() {
     privateState,
     chatMessages,
     playerId,
+    roomId,
+    roomsSummary,
     isHost,
     errorMessage,
     joinRoom,
@@ -79,6 +81,7 @@ export default function App() {
         isConnected={isConnected}
         playerCount={gameState?.players.length || 0}
         isHost={isHost}
+        roomId={roomId}
         onOpenRules={() => setRulesOpen(true)}
         onOpenResetConfirm={() => setResetConfirmOpen(true)}
         onOpenImageSheet={() => setImageSheetOpen(true)}
@@ -109,7 +112,15 @@ export default function App() {
             gameState={gameState}
             currentUserId={playerId}
             isHost={isHost}
+            roomId={roomId}
+            roomsSummary={roomsSummary}
             onJoinRoom={joinRoom}
+            onChangeRoom={(newRoomId) =>
+              joinRoom(
+                sessionStorage.getItem('mansion_player_name') || '探偵',
+                newRoomId
+              )
+            }
             onStartGame={startGame}
             onFillBots={fillBots}
             onRemoveBots={removeBots}
