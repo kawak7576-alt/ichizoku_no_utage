@@ -41,32 +41,33 @@ export function Header({
   const customThiefAvatar = avatars['phantom_thief'];
 
   const handleCopy = async () => {
-    const cleanUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
-    const shareTitle = `一族の宴 ― 消えた家宝と怪盗と ―【部屋 #${roomId}】`;
-    const shareText = `5人オンライン対戦型・正体隠匿×ワードウルフ推理ゲーム【一族の宴】の部屋 #${roomId} へ招待されました！`;
+    // Generate clean URL (for default room 01, clean origin with /; for other rooms, with ?room=XX)
+    const baseOrigin = window.location.origin;
+    const inviteUrl =
+      roomId && roomId !== '01'
+        ? `${baseOrigin}/?room=${roomId}`
+        : `${baseOrigin}/`;
 
-    // 1. Mobile native share API (LINE, Twitter, Messages)
+    // 1. Mobile native share API (LINE, Twitter, Discord)
+    // Only pass the clean URL so Discord and LINE unfurl the full OGP preview card with the image
     if (navigator.share) {
       try {
         await navigator.share({
-          title: shareTitle,
-          text: `${shareTitle}\n${shareText}\n部屋番号: #${roomId}\n`,
-          url: cleanUrl,
+          url: inviteUrl,
         });
         setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        setTimeout(() => setCopied(false), 2500);
         return;
       } catch {
         // Fallback to clipboard if user dismissed or cancelled
       }
     }
 
-    // 2. Clipboard copy with title and explanation
+    // 2. Direct clean URL clipboard copy: Pasting this into Discord/LINE automatically displays the rich image card
     try {
-      const fullCopy = `【${shareTitle}】\n${shareText}\n部屋番号: #${roomId}\n招待URL: ${cleanUrl}`;
-      await navigator.clipboard.writeText(fullCopy);
+      await navigator.clipboard.writeText(inviteUrl);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setCopied(false), 2500);
     } catch {
       // fallback
     }
